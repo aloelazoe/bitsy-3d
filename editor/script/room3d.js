@@ -25,8 +25,29 @@ var tilesInStack = {};
 var sprites = {};
 var items = {};
 
-var cursor3d = {};
-cursor3d.mesh = null;
+var CursorModes = {
+    Add: 0,
+    Remove: 1,
+    Select: 2,
+};
+
+var CursorColors = {
+    Green: new BABYLON.Color3(0, 1, 0.5),
+    Red: new BABYLON.Color3(1, 0.3, 0.3),
+    Gray: new BABYLON.Color3(1, 1, 1),
+};
+
+var cursor = {};
+cursor.mesh = null;
+cursor.roomX = null;
+cursor.roomY = null;
+cursor.curRoomId = undefined;
+cursor.isValid = false;
+cursor.mode = CursorModes.Add;
+cursor.shouldUpdate = false;
+
+// debug
+cursor.lastPick = null;
 
 function initRoom3d() {
     var canvas3d = document.getElementById('room3d');
@@ -35,10 +56,33 @@ function initRoom3d() {
     canvas3d.width = 512;
     canvas3d.height = 512;
 
+    // switch cursor mode with number keys
+    canvas3d.addEventListener('keyup', (e) => {
+        switch (e.code) {
+            case 'Digit1':
+                cursor.mode = CursorModes.Add;
+                break;
+            case 'Digit2':
+                cursor.mode = CursorModes.Remove;
+                break;
+            case 'Digit3':
+                cursor.mode = CursorModes.Select;
+                break;
+        }
+    });
+
     engine = new BABYLON.Engine(canvas3d, false);
     scene = new BABYLON.Scene(engine);
     scene.ambientColor = new BABYLON.Color3(1, 1, 1);
     scene.freezeActiveMeshes();
+
+    // make a mesh for 3d cursor
+    cursor.mesh = BABYLON.MeshBuilder.CreateBox('cursor', { size: 1.1 }, scene);
+    cursor.mesh.isPickable = false;
+    var cursorMat = new BABYLON.StandardMaterial("cursorMaterial", scene);
+    cursorMat.ambientColor = CursorColors.Green;
+    cursorMat.alpha = 0.5;
+    cursor.mesh.material = cursorMat;
 
     // create basic resources
     // box and towers
@@ -121,7 +165,7 @@ function initRoom3d() {
     wedgeMeshVertData.uvs = wedgeMeshUvs;
 
     var translation = BABYLON.Matrix.Translation(0.5, -0.5, -0.5);
-    // wedgeMeshVertData.transform(translation);
+    wedgeMeshVertData.transform(translation);
 
     wedgeMeshVertData.applyToMesh(wedgeMesh);
     wedgeMesh.isVisible = false; // but newly created copies and instances will be visible by default
@@ -191,60 +235,125 @@ function initRoom3d() {
         tilesInStack[entry[0]] = makeTilesArray(entry[1].length);
     });
 
-    // Add lights to the scene
-    // var light1 = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(1, 1, 0), scene);
-    // var light2 = new BABYLON.PointLight("light2", new BABYLON.Vector3(0, 1, -1), scene);
-
-    // // Add and manipulate meshes in the scene
-    // var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameter:2}, scene);
-
     // set the rendering loop function
     engine.runRenderLoop(render3d);
 
-
-
     // add event listeners
     canvas3d.addEventListener('mouseover', function (e) {
-        // todo: register per-frame or per-interval mouse picking
-        scene.constantlyUpdateMeshUnderPointer = true;
-        // now scene.meshUnderPointer can be used to get the mesh we are currently hovering over
+        // register 3d cursor update & mouse picking
+        cursor.shouldUpdate = true;
     });
 
     canvas3d.addEventListener('mouseleave', function (e) {
-        // todo: unregister mouse picking
-        scene.constantlyUpdateMeshUnderPointer = false;
+        // unregister 3d cursor update & mouse picking
+        cursor.shouldUpdate = false;
     });
 
     canvas3d.addEventListener('click', function (e) {
-        // if (scene.meshUnderPointer) {
-        //     console.log(scene.meshUnderPointer);
-        // }
+        // do editor actions logic here
     });
+}
 
-    scene.onPointerPick = (evt, pickInfo) => {
-        console.log('scene.onPointerPick event');
+function updateCursor(pickInfo) {
+    // assume that cursor isn't in the valid position unless it is proved to be different
+    cursor.isValid = false;
+    cursor.mesh.isVisible = false;
+    cursor.curRoomId = undefined;
 
-        if (!pickInfo || !pickInfo.hit) return;
 
-        var mesh = pickInfo.pickedMesh;
-        var faceId = pickInfo.faceId;
+    if (!pickInfo || !pickInfo.hit) return;
+    var mesh = pickInfo.pickedMesh;
+    var faceId = pickInfo.faceId;
+    var point = pickInfo.pickedPoint;
 
-        var meshName = mesh.sourceMesh.source.name;
-        console.log('id: ' + mesh.id + ', source mesh: ' + meshName + ', faceId: ' + faceId);
-        console.log(mesh);
+    // debug: store mesh for inspection
+    cursor.lastPick = mesh;
 
-        var normal = null;
+    var meshName = mesh.sourceMesh.source.name;
+    // console.log('id: ' + mesh.id + ', source mesh: ' + meshName + ', faceId: ' + faceId);
+    // console.log(mesh);
 
-        // try figuring out the normal manually
-        normal = getNormal(mesh, faceId);
-        console.log('facet normal my: ' + normal);
+    if (cursor.mode === CursorModes.Add) {
+        // console.log('cursor mode: add');
+        cursor.mesh.material.ambientColor = CursorColors.Green;
+        // figure out the normal manually, because babylon's built in method doesn't work for wedges
+        // and possibly other custom meshes
+        var normal = getNormal(mesh, faceId);
+        // console.log('face normal: ' + normal.asArray().map(i => ' ' + i.toFixed(1)));
+        // console.log('picked point: ' + point.asArray().map(i => ' ' + i.toFixed(1)));
 
-        // compare with babylon built in method that doesn't work on wedges for some reason
-        if (meshName !== 'wedgeMesh') {
-            normal = mesh.getFacetNormal(faceId)
-            console.log('facet normal bab: ' + normal);
+        // todo: improve cursor resolution for floors, planes etc
+        var cursorPos = point.add(normal.scale(0.75));
+        // hacky fix for floors
+        // hm actually i tihnk it is moreintuitive when the floors are ignored
+        // if (mesh.sourceMesh.source.name === 'floor') {
+        //     cursorPos.y = cursorPos.y + 1;
+        // }
+        // console.log('cursorPos: ' + cursorPos);
+
+        var cursorPosRounded = BABYLON.Vector3.FromArray(cursorPos.asArray().map(i => Math.round(i)));
+        // console.log('cursorPosRounded: ' + cursorPosRounded);
+
+        cursor.mesh.position = cursorPosRounded;
+
+        // figure out the corresponding bitsy cell
+        cursor.roomX = cursor.mesh.position.x;
+        cursor.roomY = bitsy.mapsize - 1 - cursor.mesh.position.z;
+        // console.log('roomX: ' + cursor.roomX + ' roomY: ' + cursor.roomY);
+
+        // todo: also make sure that the cursor isn't out of bounds
+        // if it is, don't draw the 3d cursor and make sure drawing can't be added to the scene
+        if (!(cursor.roomX * (cursor.roomX-15) <= 0) || !(cursor.roomY * (cursor.roomY-15) <= 0)) {
+            // console.log("can't place the cursor: coordinates are out of bounds");
+            return;
         }
+
+        // figure out if there is an existing room in the stack at appropriate level
+        cursor.curRoomId = roomsInStack[curStack].find((roomId) => {
+            return stackPosOfRoom[roomId].pos === cursor.mesh.position.y;
+        });
+
+        // console.log('cursor.curRoomId: ' + cursor.curRoomId);
+
+        // if the cursor resolves into an existing room,
+        // check if the space in this room is already occupied
+        if (cursor.curRoomId && !isCellFree(room[cursor.curRoomId], cursor.roomX, cursor.roomY)) {
+            // console.log("can't place the cursor: the cell isn't empty");
+            return;
+        }
+
+        cursor.isValid = true;
+        cursor.mesh.isVisible = true;
+
+    } else if (cursor.mode === CursorModes.Remove || cursor.mode === CursorModes.Select) {
+        if (cursor.mode === CursorModes.Remove) {
+            // console.log('cursor mode: remove');
+            cursor.mesh.material.ambientColor = CursorColors.Red;
+        } else if (cursor.mode === CursorModes.Select) {
+            // console.log('cursor mode: select');
+            cursor.mesh.material.ambientColor = CursorColors.Gray;
+        }
+
+        cursor.mesh.position = mesh.absolutePosition;
+
+        // hm actually this can be done when the action is performed
+        // no need to fetch a bitsy drawing every frame when it's only needed
+        // when you are clicking
+
+        cursor.isValid = true;
+        cursor.mesh.isVisible = true;
     }
+}
+
+function isCellFree(room, x, y) {
+    // use 3d hack's 'sprites' object that already keeps track of
+    // all sprites that are currently in the scene
+    return room.tilemap[y][x] === '0' &&
+           !(room.items.find(i => i.x === x && i.y === y)) &&
+           !(Object.keys(sprites).find((id) => {
+                var s = bitsy.sprite[id]
+                return s.room === room.id && s.x === x && s.y === y;
+           }));
 }
 
 function getNormal(mesh, faceId) {
@@ -253,7 +362,7 @@ function getNormal(mesh, faceId) {
     var i1 = indices[faceId * 3 + 1];
     var i2 = indices[faceId * 3 + 2];
 
-    console.log('indices: ' + i0 + ', ' + i1 + ', ' + i2);
+    // console.log('indices: ' + i0 + ', ' + i1 + ', ' + i2);
     // now get the vertices
     // console.log('data kinds:');
     // console.log(mesh.getVerticesDataKinds());
@@ -263,16 +372,19 @@ function getNormal(mesh, faceId) {
     // console.log(vertexBuf);
 
     // TODO:
+    // gotta optimize this a big deal
     // since it would be an operation to be preformed quite frequently
     // perhaps cache it or store normal data for each mesh when they are added to the scene
     // i wonder what would be faster
     // if i still would call it every time at least reuse the vectors instead of creating new ones
     // or use variables for each number. idk what would be more effecient. would be interesting to run tests
+    // or just attach the normal data to every mesh as an array where indices are the facet indices
+    // and elements are Vector3. like mesh.faceNormals[0] would correspond to faceId 0 and so on
     var p0 = new BABYLON.Vector3(vertexBuf[i0 * 3], vertexBuf[i0 * 3 + 1], vertexBuf[i0 * 3 + 2]);
     var p1 = new BABYLON.Vector3(vertexBuf[i1 * 3], vertexBuf[i1 * 3 + 1], vertexBuf[i1 * 3 + 2]);
     var p2 = new BABYLON.Vector3(vertexBuf[i2 * 3], vertexBuf[i2 * 3 + 1], vertexBuf[i2 * 3 + 2]);
 
-    console.log('points: ' + p0 + ', ' + p1 + ', ' + p2);
+    // console.log('points: ' + p0 + ', ' + p1 + ', ' + p2);
     // console.log(p0);
 
     // if i'm going to reuse them use subtractToRef(otherVector: DeepImmutable<Vector3>, result: Vector3): Vector3
@@ -287,9 +399,9 @@ function getNormal(mesh, faceId) {
     var normal = BABYLON.Vector3.Cross(tempVec1, tempVec0);
     normal.normalize();
 
-    console.log('before rotation: ' + normal);
+    // console.log('before rotation: ' + normal);
 
-    console.log('mesh rotation: ' + mesh.rotation);
+    // console.log('mesh rotation: ' + mesh.rotation);
     // console.log(mesh.absoluteRotationQuaternion); // undefined
     // console.log(mesh.rotationQuaternion); // null
     // console.log(mesh.rotation); // funally
@@ -300,15 +412,18 @@ function getNormal(mesh, faceId) {
 
     // alternative method using world transform matrix, seems to be more straightforward and effecient
     BABYLON.Vector3.TransformNormalToRef(normal, mesh.getWorldMatrix(), normal);
-    console.log('transformed by world matrix: ' + normal);
+    // console.log('transformed by world matrix: ' + normal);
 
     return normal;
 }
 
 function render3d() {
     room3dUpdate();
+
+    // update cursor
+    if (cursor.shouldUpdate) updateCursor(scene.pick(scene.pointerX, scene.pointerY));
+
     scene.render();
-    // console.log(scene.meshUnderPointer)
 }
 
 function radians(degrees) {
@@ -455,7 +570,7 @@ function room3dUpdate() {
             }
             newMesh = newMesh.createInstance();
             newMesh.position.x = sprite.x;
-            newMesh.position.z = bitsy.mapsize - sprite.y;
+            newMesh.position.z = bitsy.mapsize - 1 - sprite.y;
             newMesh.position.y = stackPosOfRoom[sprite.room].pos;
             if (id === bitsy.playerId) {
                 newMesh.name = 'player';
@@ -504,7 +619,7 @@ function room3dUpdate() {
                 }
                 newMesh = newMesh.createInstance();
                 newMesh.position.x = roomItem.x;
-                newMesh.position.z = bitsy.mapsize - roomItem.y;
+                newMesh.position.z = bitsy.mapsize - 1 - roomItem.y;
                 newMesh.position.y = stackPosOfRoom[roomId].pos;
                 applyBehaviours(newMesh, item);
                 items[key] = newMesh;
@@ -550,7 +665,7 @@ function room3dUpdate() {
                 }
                 newMesh = newMesh.createInstance();
                 newMesh.position.x = x;
-                newMesh.position.z = bitsy.mapsize - y;
+                newMesh.position.z = bitsy.mapsize - 1 - y;
                 newMesh.position.y = stackPosOfRoom[roomId].pos;
                 applyBehaviours(newMesh, bitsy.tile[roomTile]);
                 if (oldMesh) {
@@ -685,18 +800,13 @@ var hackOptions = {
 
     // function used to adjust mesh instances after they have been added to the scene
     meshExtraSetup: function (drawing, mesh) {
-        // enable facet data to easily get facet normals when mouse picking
-        // but only for mesh types that don't produce errors when trying to use facet data
-        if (['wedgeMesh', 'emptyMesh'].indexOf(mesh.sourceMesh.source.name) === -1) {
-            if (!mesh.isFacetDataEnabled) {
-                try {
-                    mesh.updateFacetData();
-                } catch (err) {
-                    console.log("couldn't get facet data for mesh " + (mesh.name || mesh.sourceMesh.source.name));
-                    console.error(err);
-                }
-            }
-        }
+        // TODO:
+        // since i use my own function to figure out face normals that works with all types of meshes,
+        // i don't really need babylonjs to calculate facet data. but i still call my function every frame so
+        // possible optimization here would be to calculate face normals once the mesh is added to the
+        // scene and attach the data to the mesh, since no meshes would be modified
+        // and there wouldn't be a need to recalculate face data later
+
         var name = drawing.name || '';
 
         // transform tags. #t(x,y,z): translate (move), #r(x,y,z): rotate, #s(x,y,z): scale
