@@ -25,199 +25,8 @@ var tilesInStack = {};
 var sprites = {};
 var items = {};
 
-var hackOptions = {
-    // Determines the resolution of the scene rendered
-    // If auto is true, the width/height will be ignored,
-    // and the scene will instead render at 1:1 with the canvas
-    // use it if you want it to look crisp on any screen
-    // otherwise, I recommend something in the range of 64-512
-    size: {
-        auto: true,
-        width: 512,
-        height: 512,
-    },
-    // set clear color and fog color
-    // default is 0: background color in the current bitsy pallete
-    clearColor: 0,
-    fogColor: 0,
-    // If true, inputs are rotated to match the current camera direction
-    // if you're using a camera that can be freely rotated,
-    // this will generally be preferable,
-    // but you may want to disable it for some setups
-    // (e.g. a fixed third person camera)
-    cameraRelativeMovement: true,
-    // If true, left/right inputs are overridden to control 90-degree camera rotations
-    // this requires `cameraRelativeMovement: true` to be usable,
-    // and it's recommended to not add camera controls if used
-    tankControls: false,
-    // scene setup
-    // a number of helper functions are provided to make this easier
-    // but the only necessary thing is to create a camera and assign it to the scene
-    init: function (scene) {
-        scene.activeCamera = makeBaseCamera(); // creates a camera with some basic presets
-        // makeOrthographic(camera, bitsy.mapsize); // makes the camera use orthographic projection (camera, size)
-        makeFollowPlayer(scene.activeCamera); // locks the camera to the player
-        addControls(scene.activeCamera); // adds rotate/zoom controls (also pan if not following player)
-        // addFog(0.5, 1.0); // adds fog in the range (start, end)
-        // addShader(`shader source`, 1.0); // adds a post-processing shader (shader source, downscale factor)
-    },
-    // If true, dialog renders at the top
-    // otherwise, renders at the bottom
-    // (bitsy's typical position-based rendering doesn't make sense in 3D)
-    topDialog: true,
-    // Function used in transparent sprites hack
-    isTransparent: function (drawing) {
-        var name = drawing.name || '';
-        var match = name.match(/#transparent\(((true)|(false))\)/);
-        if (match) {
-            // 2nd capturing group reserved for 'true' will be undefined if the input said 'false'
-            return Boolean(match[2]);
-        }
-        return !drawing.drw.includes('TIL');
-    },
-    // Function used to determine how a bitsy drawing is translated into a 3D object
-    // available types are:
-    //  - 'plane': plane standing up straight
-    //  - 'billboard': like plane, but turns to look at the camera
-    //  - 'box': standard cube
-    //  - 'floor': plane flat on the ground
-    //  - 'tower1', 'tower2', etc: box variations that are taller and tiled
-    //  - 'wedge': base mesh for wedges, facing left with its slanted side
-    //  - 'empty': empty mesh for making drawings invisible
-    getType: function (drawing) {
-        var drw = drawing.drw;
-        var name = drawing.name || '';
-
-        // match the drawing's name against the regular expression
-        // that describes #mesh(type) tag
-        var meshMatch = name.match(/#mesh\((.+?)\)/);
-        if (meshMatch) {
-            if (meshTemplates[meshMatch[1]]) {
-                return meshMatch[1];
-            } else {
-                // if the specified mesh template doesn't exist,
-                // display error message, but continue execution
-                // to resolve the mesh with default logic
-                console.error(`mesh template '${meshMatch[1]}' wasn't found`);
-            }
-        }
-
-        // default
-        if (drawing.id === bitsy.playerId) {
-            return 'plane';
-        }
-        if (drw.startsWith('ITM')) {
-            return 'plane';
-        }
-        if (drw.startsWith('SPR')) {
-            return 'billboard';
-        }
-        if (drawing.isWall) {
-            return 'box';
-        }
-        return 'floor';
-    },
-    // controls how the 'billboard' type behaves
-    // recommendation: the default provided below, or BABYLON.TransformNode.BILLBOARDMODE_ALL
-    getBillboardMode: function (BABYLON) {
-        return BABYLON.TransformNode.BILLBOARDMODE_Y | BABYLON.TransformNode.BILLBOARDMODE_Z;
-    },
-    // If true, textures will be preloaded before they're needed while idle
-    // it's recommended to keep this on for more consistent performance post-startup
-    // (without it, you may notice stutter the first time you enter a room)
-    // but if you have a big, highly branching game with lots of art,
-    // you may want to disable it
-    preloadTextures: true,
-
-    // function used to adjust mesh instances after they have been added to the scene
-    meshExtraSetup: function (drawing, mesh) {
-        var name = drawing.name || '';
-
-        // transform tags. #t(x,y,z): translate (move), #r(x,y,z): rotate, #s(x,y,z): scale
-        // #m(1,0,0.5) and #m(1,,.5) are both examples of valid input
-        // scale
-        var scaleTag = name.match(/#s\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-        if (scaleTag) {
-            mesh.scaling = new BABYLON.Vector3(
-                Number(scaleTag[1]) || 0,
-                Number(scaleTag[2]) || 0,
-                Number(scaleTag[3]) || 0
-            );
-        }
-        // rotate. input in degrees
-        var rotateTag = name.match(/#r\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-        if (rotateTag) {
-            mesh.rotation.x += radians(Number(rotateTag[1]) || 0);
-            mesh.rotation.y += radians(Number(rotateTag[2]) || 0);
-            mesh.rotation.z += radians(Number(rotateTag[3]) || 0);
-        }
-        // translate (move)
-        var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-        if (translateTag) {
-            mesh.position.x += (Number(translateTag[1]) || 0);
-            mesh.position.y += (Number(translateTag[2]) || 0);
-            mesh.position.z += (Number(translateTag[3]) || 0);
-        }
-
-        // children tag
-        // for now for animation to work gotta make sure that the parent drawing has as many frames as children
-        var childrenTag;
-        // make sure the mesh we are about to add children to doesn't have a parent on its own to avoid ifinite loops
-        // maybe add checking for parents of parents recursively up to a certain number to allow more complex combinations
-        if (!mesh.parent) {
-            childrenTag = name.match(/#children\(([\w-, ]+)\)/);
-        }
-        if (childrenTag) {
-            // parse args and get the actual drawings
-            var children = childrenTag[1].split(/, |,/).map(function(arg) {
-                if (arg) {
-                    var type, id, map;
-                    [type, id] = arg.split(/[ _-]/);
-                    if (type && id) {
-                        switch (type[0].toLowerCase()) {
-                            case 't':
-                                map = bitsy.tile;
-                                break;
-                            case 'i':
-                                map = bitsy.item;
-                                break;
-                            case 's':
-                                map = bitsy.sprite;
-                        }
-                        if (map) {
-                            return map[id];
-                        }
-                    }
-                }
-            }).filter(Boolean);
-
-            // add specified drawings to the scene as child meshes
-            children.forEach(function(childDrawing) {
-                var childMesh = getMesh(childDrawing, bitsy.curPal());
-                childMesh = childMesh.createInstance();
-                childMesh.position.x = mesh.position.x;
-                childMesh.position.y = mesh.position.y;
-                childMesh.position.z = mesh.position.z;
-                mesh.addChild(childMesh);
-                applyBehaviours(childMesh, childDrawing);
-                // make sure children can move if they are parented to the avatar
-                if (drawing == bitsy.player()) {
-                    childMesh.unfreezeWorldMatrix();
-                }
-            });
-        }
-    },
-    // smooth moves hack options
-    // duration of ease in ms
-    duration: 100,
-    // max distance to allow tweens
-    delta: 1.5,
-    // easing function
-    ease: function(t) {
-        t = 1 - Math.pow(1 - t, 2);
-        return t;
-    },
-};
+var cursor3d = {};
+cursor3d.mesh = null;
 
 function initRoom3d() {
     var canvas3d = document.getElementById('room3d');
@@ -312,7 +121,7 @@ function initRoom3d() {
     wedgeMeshVertData.uvs = wedgeMeshUvs;
 
     var translation = BABYLON.Matrix.Translation(0.5, -0.5, -0.5);
-    wedgeMeshVertData.transform(translation);
+    // wedgeMeshVertData.transform(translation);
 
     wedgeMeshVertData.applyToMesh(wedgeMesh);
     wedgeMesh.isVisible = false; // but newly created copies and instances will be visible by default
@@ -407,10 +216,93 @@ function initRoom3d() {
     });
 
     canvas3d.addEventListener('click', function (e) {
-        if (scene.meshUnderPointer) {
-            scene.meshUnderPointer.dispose();
-        }
+        // if (scene.meshUnderPointer) {
+        //     console.log(scene.meshUnderPointer);
+        // }
     });
+
+    scene.onPointerPick = (evt, pickInfo) => {
+        console.log('scene.onPointerPick event');
+
+        if (!pickInfo || !pickInfo.hit) return;
+
+        var mesh = pickInfo.pickedMesh;
+        var faceId = pickInfo.faceId;
+
+        var meshName = mesh.sourceMesh.source.name;
+        console.log('id: ' + mesh.id + ', source mesh: ' + meshName + ', faceId: ' + faceId);
+        console.log(mesh);
+
+        var normal = null;
+
+        // try figuring out the normal manually
+        normal = getNormal(mesh, faceId);
+        console.log('facet normal my: ' + normal);
+
+        // compare with babylon built in method that doesn't work on wedges for some reason
+        if (meshName !== 'wedgeMesh') {
+            normal = mesh.getFacetNormal(faceId)
+            console.log('facet normal bab: ' + normal);
+        }
+    }
+}
+
+function getNormal(mesh, faceId) {
+    var indices = mesh.getIndices();
+    var i0 = indices[faceId * 3];
+    var i1 = indices[faceId * 3 + 1];
+    var i2 = indices[faceId * 3 + 2];
+
+    console.log('indices: ' + i0 + ', ' + i1 + ', ' + i2);
+    // now get the vertices
+    // console.log('data kinds:');
+    // console.log(mesh.getVerticesDataKinds());
+
+    var vertexBuf = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind, false);
+    // console.log('vertexBuf:');
+    // console.log(vertexBuf);
+
+    // TODO:
+    // since it would be an operation to be preformed quite frequently
+    // perhaps cache it or store normal data for each mesh when they are added to the scene
+    // i wonder what would be faster
+    // if i still would call it every time at least reuse the vectors instead of creating new ones
+    // or use variables for each number. idk what would be more effecient. would be interesting to run tests
+    var p0 = new BABYLON.Vector3(vertexBuf[i0 * 3], vertexBuf[i0 * 3 + 1], vertexBuf[i0 * 3 + 2]);
+    var p1 = new BABYLON.Vector3(vertexBuf[i1 * 3], vertexBuf[i1 * 3 + 1], vertexBuf[i1 * 3 + 2]);
+    var p2 = new BABYLON.Vector3(vertexBuf[i2 * 3], vertexBuf[i2 * 3 + 1], vertexBuf[i2 * 3 + 2]);
+
+    console.log('points: ' + p0 + ', ' + p1 + ', ' + p2);
+    // console.log(p0);
+
+    // if i'm going to reuse them use subtractToRef(otherVector: DeepImmutable<Vector3>, result: Vector3): Vector3
+    var tempVec0 = p0.subtract(p1);
+    var tempVec1 = p0.subtract(p2);
+
+    // var normal = tempVec0.cross(tempVec1);
+    // wtf... Vector3.cross is undefined even though it's in documentation
+    // this is so fucking weird and frustrating
+    // hopefully the static version will work
+    // tempVec1, tempVec0 order seems to be correct
+    var normal = BABYLON.Vector3.Cross(tempVec1, tempVec0);
+    normal.normalize();
+
+    console.log('before rotation: ' + normal);
+
+    console.log('mesh rotation: ' + mesh.rotation);
+    // console.log(mesh.absoluteRotationQuaternion); // undefined
+    // console.log(mesh.rotationQuaternion); // null
+    // console.log(mesh.rotation); // funally
+    // and again wtf mesh.absoluteRotationQuaternion is undefined
+    // normal.rotateByQuaternionToRef(new BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, mesh.rotation.y), normal);
+    // console.log('rotateByQuaternionToRef: ' + normal);
+
+
+    // alternative method using world transform matrix, seems to be more straightforward and effecient
+    BABYLON.Vector3.TransformNormalToRef(normal, mesh.getWorldMatrix(), normal);
+    console.log('transformed by world matrix: ' + normal);
+
+    return normal;
 }
 
 function render3d() {
@@ -686,3 +578,209 @@ function getColor(colorId) {
         col[2] / 255
     );
 }
+
+var hackOptions = {
+    // Determines the resolution of the scene rendered
+    // If auto is true, the width/height will be ignored,
+    // and the scene will instead render at 1:1 with the canvas
+    // use it if you want it to look crisp on any screen
+    // otherwise, I recommend something in the range of 64-512
+    size: {
+        auto: true,
+        width: 512,
+        height: 512,
+    },
+    // set clear color and fog color
+    // default is 0: background color in the current bitsy pallete
+    clearColor: 0,
+    fogColor: 0,
+    // If true, inputs are rotated to match the current camera direction
+    // if you're using a camera that can be freely rotated,
+    // this will generally be preferable,
+    // but you may want to disable it for some setups
+    // (e.g. a fixed third person camera)
+    cameraRelativeMovement: true,
+    // If true, left/right inputs are overridden to control 90-degree camera rotations
+    // this requires `cameraRelativeMovement: true` to be usable,
+    // and it's recommended to not add camera controls if used
+    tankControls: false,
+    // scene setup
+    // a number of helper functions are provided to make this easier
+    // but the only necessary thing is to create a camera and assign it to the scene
+    init: function (scene) {
+        scene.activeCamera = makeBaseCamera(); // creates a camera with some basic presets
+        // makeOrthographic(camera, bitsy.mapsize); // makes the camera use orthographic projection (camera, size)
+        makeFollowPlayer(scene.activeCamera); // locks the camera to the player
+        addControls(scene.activeCamera); // adds rotate/zoom controls (also pan if not following player)
+        // addFog(0.5, 1.0); // adds fog in the range (start, end)
+        // addShader(`shader source`, 1.0); // adds a post-processing shader (shader source, downscale factor)
+    },
+    // If true, dialog renders at the top
+    // otherwise, renders at the bottom
+    // (bitsy's typical position-based rendering doesn't make sense in 3D)
+    topDialog: true,
+    // Function used in transparent sprites hack
+    isTransparent: function (drawing) {
+        var name = drawing.name || '';
+        var match = name.match(/#transparent\(((true)|(false))\)/);
+        if (match) {
+            // 2nd capturing group reserved for 'true' will be undefined if the input said 'false'
+            return Boolean(match[2]);
+        }
+        return !drawing.drw.includes('TIL');
+    },
+    // Function used to determine how a bitsy drawing is translated into a 3D object
+    // available types are:
+    //  - 'plane': plane standing up straight
+    //  - 'billboard': like plane, but turns to look at the camera
+    //  - 'box': standard cube
+    //  - 'floor': plane flat on the ground
+    //  - 'tower1', 'tower2', etc: box variations that are taller and tiled
+    //  - 'wedge': base mesh for wedges, facing left with its slanted side
+    //  - 'empty': empty mesh for making drawings invisible
+    getType: function (drawing) {
+        var drw = drawing.drw;
+        var name = drawing.name || '';
+
+        // match the drawing's name against the regular expression
+        // that describes #mesh(type) tag
+        var meshMatch = name.match(/#mesh\((.+?)\)/);
+        if (meshMatch) {
+            if (meshTemplates[meshMatch[1]]) {
+                return meshMatch[1];
+            } else {
+                // if the specified mesh template doesn't exist,
+                // display error message, but continue execution
+                // to resolve the mesh with default logic
+                console.error(`mesh template '${meshMatch[1]}' wasn't found`);
+            }
+        }
+
+        // default
+        if (drawing.id === bitsy.playerId) {
+            return 'plane';
+        }
+        if (drw.startsWith('ITM')) {
+            return 'plane';
+        }
+        if (drw.startsWith('SPR')) {
+            return 'billboard';
+        }
+        if (drawing.isWall) {
+            return 'box';
+        }
+        return 'floor';
+    },
+    // controls how the 'billboard' type behaves
+    // recommendation: the default provided below, or BABYLON.TransformNode.BILLBOARDMODE_ALL
+    getBillboardMode: function (BABYLON) {
+        return BABYLON.TransformNode.BILLBOARDMODE_Y | BABYLON.TransformNode.BILLBOARDMODE_Z;
+    },
+    // If true, textures will be preloaded before they're needed while idle
+    // it's recommended to keep this on for more consistent performance post-startup
+    // (without it, you may notice stutter the first time you enter a room)
+    // but if you have a big, highly branching game with lots of art,
+    // you may want to disable it
+    preloadTextures: true,
+
+    // function used to adjust mesh instances after they have been added to the scene
+    meshExtraSetup: function (drawing, mesh) {
+        // enable facet data to easily get facet normals when mouse picking
+        // but only for mesh types that don't produce errors when trying to use facet data
+        if (['wedgeMesh', 'emptyMesh'].indexOf(mesh.sourceMesh.source.name) === -1) {
+            if (!mesh.isFacetDataEnabled) {
+                try {
+                    mesh.updateFacetData();
+                } catch (err) {
+                    console.log("couldn't get facet data for mesh " + (mesh.name || mesh.sourceMesh.source.name));
+                    console.error(err);
+                }
+            }
+        }
+        var name = drawing.name || '';
+
+        // transform tags. #t(x,y,z): translate (move), #r(x,y,z): rotate, #s(x,y,z): scale
+        // #m(1,0,0.5) and #m(1,,.5) are both examples of valid input
+        // scale
+        var scaleTag = name.match(/#s\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
+        if (scaleTag) {
+            mesh.scaling = new BABYLON.Vector3(
+                Number(scaleTag[1]) || 0,
+                Number(scaleTag[2]) || 0,
+                Number(scaleTag[3]) || 0
+            );
+        }
+        // rotate. input in degrees
+        var rotateTag = name.match(/#r\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
+        if (rotateTag) {
+            mesh.rotation.x += radians(Number(rotateTag[1]) || 0);
+            mesh.rotation.y += radians(Number(rotateTag[2]) || 0);
+            mesh.rotation.z += radians(Number(rotateTag[3]) || 0);
+        }
+        // translate (move)
+        var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
+        if (translateTag) {
+            mesh.position.x += (Number(translateTag[1]) || 0);
+            mesh.position.y += (Number(translateTag[2]) || 0);
+            mesh.position.z += (Number(translateTag[3]) || 0);
+        }
+
+        // children tag
+        // for now for animation to work gotta make sure that the parent drawing has as many frames as children
+        var childrenTag;
+        // make sure the mesh we are about to add children to doesn't have a parent on its own to avoid ifinite loops
+        // maybe add checking for parents of parents recursively up to a certain number to allow more complex combinations
+        if (!mesh.parent) {
+            childrenTag = name.match(/#children\(([\w-, ]+)\)/);
+        }
+        if (childrenTag) {
+            // parse args and get the actual drawings
+            var children = childrenTag[1].split(/, |,/).map(function(arg) {
+                if (arg) {
+                    var type, id, map;
+                    [type, id] = arg.split(/[ _-]/);
+                    if (type && id) {
+                        switch (type[0].toLowerCase()) {
+                            case 't':
+                                map = bitsy.tile;
+                                break;
+                            case 'i':
+                                map = bitsy.item;
+                                break;
+                            case 's':
+                                map = bitsy.sprite;
+                        }
+                        if (map) {
+                            return map[id];
+                        }
+                    }
+                }
+            }).filter(Boolean);
+
+            // add specified drawings to the scene as child meshes
+            children.forEach(function(childDrawing) {
+                var childMesh = getMesh(childDrawing, bitsy.curPal());
+                childMesh = childMesh.createInstance();
+                childMesh.position.x = mesh.position.x;
+                childMesh.position.y = mesh.position.y;
+                childMesh.position.z = mesh.position.z;
+                mesh.addChild(childMesh);
+                applyBehaviours(childMesh, childDrawing);
+                // make sure children can move if they are parented to the avatar
+                if (drawing == bitsy.player()) {
+                    childMesh.unfreezeWorldMatrix();
+                }
+            });
+        }
+    },
+    // smooth moves hack options
+    // duration of ease in ms
+    duration: 100,
+    // max distance to allow tweens
+    delta: 1.5,
+    // easing function
+    ease: function(t) {
+        t = 1 - Math.pow(1 - t, 2);
+        return t;
+    },
+};
