@@ -45,9 +45,10 @@ cursor.curRoomId = undefined;
 cursor.isValid = false;
 cursor.mode = CursorModes.Add;
 cursor.shouldUpdate = false;
+cursor.pickedMesh = null;
 
-// debug
-cursor.lastPick = null;
+// debug. set this when clicking on the mesh in select mode
+curSelectedMesh = null;
 
 function initRoom3d() {
     var canvas3d = document.getElementById('room3d');
@@ -250,7 +251,126 @@ function initRoom3d() {
     });
 
     canvas3d.addEventListener('click', function (e) {
+        // todo: instead of 'click' use mouseup and make sure no operations are attemted
+        // on the frame when the mouse is released after dragging to position the camera
+
         // do editor actions logic here
+        if (!cursor.isValid) return;
+        if (cursor.mode === CursorModes.Add) {
+            console.log('going to add new drawing now!');
+            console.log('curRoomId: ' + cursor.curRoomId);
+            // console.log(drawing);
+            // return if there is no currently selected drawing
+            if (!bitsy.drawing) return;
+
+            if (!cursor.curRoomId) {
+                // see if the cursor points to an existing room or a new room should be added
+                // if a new room should be added, create it and update the curRoomId on the cursor
+                // also make sure new room is integrated in the current stack data
+
+                // note: this function sets bitsy.curRoom to newly created room
+                bitsy.newRoom();
+                var newRoomId = bitsy.curRoom;
+                bitsy.room[newRoomId].name = `#stack(${curStack},${cursor.mesh.position.y})`;
+                bitsy.updateNamesFromCurData();
+
+                cursor.curRoomId = newRoomId;
+                roomsInStack[curStack].push(newRoomId);
+                stackPosOfRoom[newRoomId] = {
+                    stack: curStack,
+                    pos: cursor.mesh.position.y,
+                };
+                // initialize a new layer of tile mesh placeholders
+                tilesInStack[curStack].forEach((row) => {
+                    row.forEach((coln) => {
+                        coln.push(['-1', null]);
+                    });
+                });
+            }
+
+            if (bitsy.drawing.type === bitsy.TileType.Tile) {
+                console.log('adding new tile');
+                bitsy.room[cursor.curRoomId].tilemap[cursor.roomY][cursor.roomX] = bitsy.drawing.id;
+            } else if (bitsy.drawing.type === bitsy.TileType.Sprite || bitsy.drawing.type === bitsy.TileType.Avatar) {
+                var s = bitsy.sprite[bitsy.drawing.id];
+                s.room = cursor.curRoomId;
+                s.x = cursor.roomX;
+                s.y = cursor.roomY;
+
+                // if there already is a mesh for this sprite, move it accordingly
+                var mesh = sprites[bitsy.drawing.id];
+                if (mesh) {
+                    mesh.position = cursor.mesh.position;
+                    // make sure to reapply additional transformation from tags
+                    applyTransformTags(s, mesh);
+                }
+            } else if (bitsy.drawing.type === bitsy.TileType.Item) {
+                bitsy.room[cursor.curRoomId].items.push({
+                    id: bitsy.drawing.id,
+                    x: cursor.roomX,
+                    y: cursor.roomY,
+                });
+            }
+            bitsy.curRoom = cursor.curRoomId;
+            bitsy.refreshGameData();
+        // if cursor mode is 'select' or 'remove' picked mesh is not falsy
+        } else if (cursor.pickedMesh) {
+            // ref in global variable for debug
+            curSelectedMesh = cursor.pickedMesh;
+
+            // as the children tag currently does, assume that children can't be nested
+            var bitsyOrigin = cursor.pickedMesh.bitsyOrigin || cursor.pickedMesh.parent.bitsyOrigin;
+
+            console.log('bitsy origin:');
+            console.log(bitsyOrigin);
+
+            bitsy.curRoom = bitsyOrigin.roomId;
+
+            // i could infer what drawing it is from the position of the cursor
+            // but there could be cases when a mesh can be pushed outside of its bitsy cell using transform tags
+            // or when there are several rooms in the stack positioned at the same level
+            // would be more robust to attach the data about it's exact bitsy context to the mesh object
+            // when the mesh is created and read it here
+            if (cursor.mode === CursorModes.Select) {
+                // call the function that bitsy calls when alt-clicking
+                // this function relies on bitsy.curRoom to find the drawing
+                bitsy.editDrawingAtCoordinate(bitsyOrigin.x, bitsyOrigin.y);
+            } else {
+                // remove the selected drawing from the room data or move sprite
+                switch (bitsyOrigin.type) {
+                    case bitsy.TileType.Avatar:
+                        return;
+                    case bitsy.TileType.Sprite:
+                        bitsy.sprite[bitsyOrigin.id].room = null;
+                        bitsy.sprite[bitsyOrigin.id].x = -1;
+                        bitsy.sprite[bitsyOrigin.id].y = -1;
+                        // clean up 3d hack's 'sprites'
+                        sprites[bitsyOrigin.id].dispose();
+                        sprites[bitsyOrigin.id] = null;
+                        delete sprites[bitsyOrigin.id];
+                        break;
+                    case bitsy.TileType.Item:
+                        var roomItems = bitsy.room[bitsyOrigin.roomId].items;
+                        var itemIndex = roomItems.findIndex((i) => {
+                            return i.id === bitsyOrigin.id &&
+                                i.x === bitsyOrigin.x &&
+                                i.y === bitsyOrigin.y;
+                        });
+                        if (itemIndex !== -1) {
+                            roomItems.splice(itemIndex, 1);
+                        } else {
+                            console.error("can't find an item to remove");
+                            return;
+                        }
+                        break;
+                    case bitsy.TileType.Tile:
+                        bitsy.room[bitsyOrigin.roomId].tilemap[bitsyOrigin.y][bitsyOrigin.x] = '0';
+                        break;
+                }
+            }
+        }
+        bitsy.roomTool.drawEditMap();
+        bitsy.updateRoomName();
     });
 }
 
@@ -260,14 +380,10 @@ function updateCursor(pickInfo) {
     cursor.mesh.isVisible = false;
     cursor.curRoomId = undefined;
 
-
     if (!pickInfo || !pickInfo.hit) return;
     var mesh = pickInfo.pickedMesh;
     var faceId = pickInfo.faceId;
     var point = pickInfo.pickedPoint;
-
-    // debug: store mesh for inspection
-    cursor.lastPick = mesh;
 
     var meshName = mesh.sourceMesh.source.name;
     // console.log('id: ' + mesh.id + ', source mesh: ' + meshName + ', faceId: ' + faceId);
@@ -301,7 +417,7 @@ function updateCursor(pickInfo) {
         cursor.roomY = bitsy.mapsize - 1 - cursor.mesh.position.z;
         // console.log('roomX: ' + cursor.roomX + ' roomY: ' + cursor.roomY);
 
-        // todo: also make sure that the cursor isn't out of bounds
+        // make sure that the cursor isn't out of bounds
         // if it is, don't draw the 3d cursor and make sure drawing can't be added to the scene
         if (!(cursor.roomX * (cursor.roomX-15) <= 0) || !(cursor.roomY * (cursor.roomY-15) <= 0)) {
             // console.log("can't place the cursor: coordinates are out of bounds");
@@ -339,6 +455,7 @@ function updateCursor(pickInfo) {
         // hm actually this can be done when the action is performed
         // no need to fetch a bitsy drawing every frame when it's only needed
         // when you are clicking
+        cursor.pickedMesh = mesh;
 
         cursor.isValid = true;
         cursor.mesh.isVisible = true;
@@ -572,8 +689,20 @@ function room3dUpdate() {
             newMesh.position.x = sprite.x;
             newMesh.position.z = bitsy.mapsize - 1 - sprite.y;
             newMesh.position.y = stackPosOfRoom[sprite.room].pos;
+
+            // 3d editor addition: add new property to correctly determine meshes origin in bitsy-world
+            newMesh.bitsyOrigin = {
+                id: id,
+                x: sprite.x,
+                y: sprite.y,
+                roomId: sprite.room,
+                type: bitsy.TileType.Sprite,
+            };
+
             if (id === bitsy.playerId) {
                 newMesh.name = 'player';
+                // make sure to correct the type: avatar should not be deleted
+                newMesh.bitsyOrigin.type = bitsy.TileType.Avatar;
             }
             applyBehaviours(newMesh, sprite);
             sprites[id] = oldMesh = newMesh;
@@ -621,6 +750,16 @@ function room3dUpdate() {
                 newMesh.position.x = roomItem.x;
                 newMesh.position.z = bitsy.mapsize - 1 - roomItem.y;
                 newMesh.position.y = stackPosOfRoom[roomId].pos;
+
+                // 3d editor addition: add new property to correctly determine meshes origin in bitsy-world
+                newMesh.bitsyOrigin = {
+                    id: roomItem.id,
+                    x: roomItem.x,
+                    y: roomItem.y,
+                    roomId: roomId,
+                    type: bitsy.TileType.Item,
+                };
+
                 applyBehaviours(newMesh, item);
                 items[key] = newMesh;
             }
@@ -667,6 +806,16 @@ function room3dUpdate() {
                 newMesh.position.x = x;
                 newMesh.position.z = bitsy.mapsize - 1 - y;
                 newMesh.position.y = stackPosOfRoom[roomId].pos;
+
+                // 3d editor addition: add new property to correctly determine meshes origin in bitsy-world
+                newMesh.bitsyOrigin = {
+                    id: roomTile,
+                    x: x,
+                    y: y,
+                    roomId: roomId,
+                    type: bitsy.TileType.Tile,
+                };
+
                 applyBehaviours(newMesh, bitsy.tile[roomTile]);
                 if (oldMesh) {
                     oldMesh.dispose();
@@ -692,6 +841,84 @@ function getColor(colorId) {
         col[1] / 255,
         col[2] / 255
     );
+}
+
+function applyTransformTags(drawing, mesh) {
+    var name = drawing.name || '';
+    // transform tags. #t(x,y,z): translate (move), #r(x,y,z): rotate, #s(x,y,z): scale
+    // #m(1,0,0.5) and #m(1,,.5) are both examples of valid input
+    // scale
+    var scaleTag = name.match(/#s\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
+    if (scaleTag) {
+        mesh.scaling = new BABYLON.Vector3(
+            Number(scaleTag[1]) || 0,
+            Number(scaleTag[2]) || 0,
+            Number(scaleTag[3]) || 0
+        );
+    }
+    // rotate. input in degrees
+    var rotateTag = name.match(/#r\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
+    if (rotateTag) {
+        mesh.rotation.x += radians(Number(rotateTag[1]) || 0);
+        mesh.rotation.y += radians(Number(rotateTag[2]) || 0);
+        mesh.rotation.z += radians(Number(rotateTag[3]) || 0);
+    }
+    // translate (move)
+    var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
+    if (translateTag) {
+        mesh.position.x += (Number(translateTag[1]) || 0);
+        mesh.position.y += (Number(translateTag[2]) || 0);
+        mesh.position.z += (Number(translateTag[3]) || 0);
+    }
+}
+
+function applyChildrenTag(drawing, mesh) {
+    var name = drawing.name || '';
+    // children tag
+    // for now for animation to work gotta make sure that the parent drawing has as many frames as children
+    var childrenTag;
+    // make sure the mesh we are about to add children to doesn't have a parent on its own to avoid ifinite loops
+    // maybe add checking for parents of parents recursively up to a certain number to allow more complex combinations
+    if (!mesh.parent) {
+        childrenTag = name.match(/#children\(([\w-, ]+)\)/);
+    }
+    if (childrenTag) {
+        // parse args and get the actual drawings
+        var children = childrenTag[1].split(/, |,/).map(function(arg) {
+            if (arg) {
+                var type, id, map;
+                [type, id] = arg.split(/[ _-]/);
+                if (type && id) {
+                    switch (type[0].toLowerCase()) {
+                        case 't':
+                            map = bitsy.tile;
+                            break;
+                        case 'i':
+                            map = bitsy.item;
+                            break;
+                        case 's':
+                            map = bitsy.sprite;
+                    }
+                    if (map) {
+                        return map[id];
+                    }
+                }
+            }
+        }).filter(Boolean);
+
+        // add specified drawings to the scene as child meshes
+        children.forEach(function(childDrawing) {
+            var childMesh = getMesh(childDrawing, bitsy.curPal());
+            childMesh = childMesh.createInstance();
+            childMesh.position.x = mesh.position.x;
+            childMesh.position.y = mesh.position.y;
+            childMesh.position.z = mesh.position.z;
+            mesh.addChild(childMesh);
+            applyBehaviours(childMesh, childDrawing);
+            // for editor version of the 3d hack allow all child meshes to move with their parent
+            childMesh.unfreezeWorldMatrix();
+        });
+    }
 }
 
 var hackOptions = {
@@ -800,88 +1027,8 @@ var hackOptions = {
 
     // function used to adjust mesh instances after they have been added to the scene
     meshExtraSetup: function (drawing, mesh) {
-        // TODO:
-        // since i use my own function to figure out face normals that works with all types of meshes,
-        // i don't really need babylonjs to calculate facet data. but i still call my function every frame so
-        // possible optimization here would be to calculate face normals once the mesh is added to the
-        // scene and attach the data to the mesh, since no meshes would be modified
-        // and there wouldn't be a need to recalculate face data later
-
-        var name = drawing.name || '';
-
-        // transform tags. #t(x,y,z): translate (move), #r(x,y,z): rotate, #s(x,y,z): scale
-        // #m(1,0,0.5) and #m(1,,.5) are both examples of valid input
-        // scale
-        var scaleTag = name.match(/#s\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-        if (scaleTag) {
-            mesh.scaling = new BABYLON.Vector3(
-                Number(scaleTag[1]) || 0,
-                Number(scaleTag[2]) || 0,
-                Number(scaleTag[3]) || 0
-            );
-        }
-        // rotate. input in degrees
-        var rotateTag = name.match(/#r\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-        if (rotateTag) {
-            mesh.rotation.x += radians(Number(rotateTag[1]) || 0);
-            mesh.rotation.y += radians(Number(rotateTag[2]) || 0);
-            mesh.rotation.z += radians(Number(rotateTag[3]) || 0);
-        }
-        // translate (move)
-        var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-        if (translateTag) {
-            mesh.position.x += (Number(translateTag[1]) || 0);
-            mesh.position.y += (Number(translateTag[2]) || 0);
-            mesh.position.z += (Number(translateTag[3]) || 0);
-        }
-
-        // children tag
-        // for now for animation to work gotta make sure that the parent drawing has as many frames as children
-        var childrenTag;
-        // make sure the mesh we are about to add children to doesn't have a parent on its own to avoid ifinite loops
-        // maybe add checking for parents of parents recursively up to a certain number to allow more complex combinations
-        if (!mesh.parent) {
-            childrenTag = name.match(/#children\(([\w-, ]+)\)/);
-        }
-        if (childrenTag) {
-            // parse args and get the actual drawings
-            var children = childrenTag[1].split(/, |,/).map(function(arg) {
-                if (arg) {
-                    var type, id, map;
-                    [type, id] = arg.split(/[ _-]/);
-                    if (type && id) {
-                        switch (type[0].toLowerCase()) {
-                            case 't':
-                                map = bitsy.tile;
-                                break;
-                            case 'i':
-                                map = bitsy.item;
-                                break;
-                            case 's':
-                                map = bitsy.sprite;
-                        }
-                        if (map) {
-                            return map[id];
-                        }
-                    }
-                }
-            }).filter(Boolean);
-
-            // add specified drawings to the scene as child meshes
-            children.forEach(function(childDrawing) {
-                var childMesh = getMesh(childDrawing, bitsy.curPal());
-                childMesh = childMesh.createInstance();
-                childMesh.position.x = mesh.position.x;
-                childMesh.position.y = mesh.position.y;
-                childMesh.position.z = mesh.position.z;
-                mesh.addChild(childMesh);
-                applyBehaviours(childMesh, childDrawing);
-                // make sure children can move if they are parented to the avatar
-                if (drawing == bitsy.player()) {
-                    childMesh.unfreezeWorldMatrix();
-                }
-            });
-        }
+        applyTransformTags(drawing, mesh);
+        applyChildrenTag(drawing, mesh);
     },
     // smooth moves hack options
     // duration of ease in ms
