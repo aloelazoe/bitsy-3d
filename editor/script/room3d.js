@@ -311,20 +311,20 @@ function initRoom3d() {
         }
     });
 
-    canvas3d.addEventListener('pointerdown', function (e) {
+    scene.onPointerDown = function (e) {
         cursor.isMouseDown = true;
-    });
+    };
 
-    canvas3d.addEventListener('pointermove', function (e) {
+    scene.onPointerMove = function (e) {
         // don't update the cursor when moving the camera
         if (cursor.shouldUpdate && cursor.isMouseDown) {
             cursor.shouldUpdate = false;
             cursor.isValid = false;
             cursor.mesh.isVisible = false;
         }
-    });
+    };
 
-    canvas3d.addEventListener('pointerup', function (e) {
+    scene.onPointerUp = function (e) {
         cursor.isMouseDown = false;
         // continue updating cursor after moving the camera
         cursor.shouldUpdate = true;
@@ -456,7 +456,7 @@ function initRoom3d() {
         }
         bitsy.roomTool.drawEditMap();
         bitsy.updateRoomName();
-    });
+    };
 }
 
 function updateCursor(pickInfo) {
@@ -483,8 +483,12 @@ function updateCursor(pickInfo) {
         // console.log('face normal: ' + normal.asArray().map(i => ' ' + i.toFixed(1)));
         // console.log('picked point: ' + point.asArray().map(i => ' ' + i.toFixed(1)));
 
-        // todo: improve cursor resolution for floors, planes etc
-        var cursorPos = point.add(normal.scale(0.75));
+        // improve cursor resolution for floors, planes, billboards etc
+        // so that it's always placed between the object you are hovering over and the camera
+        // use dot product to find out if the normal faces in similar direction with the ray
+        // and flip it if it does
+        var dotProduct = BABYLON.Vector3.Dot(pickInfo.ray.direction, normal);
+        var cursorPos = point.add(normal.scale(0.75 * -Math.sign(dotProduct)));
 
         var cursorPosRounded = BABYLON.Vector3.FromArray(cursorPos.asArray().map(i => Math.round(i)));
         // console.log('cursorPosRounded: ' + cursorPosRounded);
