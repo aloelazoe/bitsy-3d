@@ -398,7 +398,13 @@ function initRoom3d() {
             curSelectedMesh = cursor.pickedMesh;
 
             // as the children tag currently does, assume that children can't be nested
-            var bitsyOrigin = cursor.pickedMesh.bitsyOrigin || cursor.pickedMesh.parent.bitsyOrigin;
+            try {
+                var bitsyOrigin = cursor.pickedMesh.bitsyOrigin || cursor.pickedMesh.parent.bitsyOrigin;
+            } catch (err) {
+                console.error("picked mesh doesn't have a bitsyOrigin");
+                console.log(cursor.pickedMesh);
+                return;
+            }
 
             console.log('bitsy origin:');
             console.log(bitsyOrigin);
@@ -459,12 +465,12 @@ function updateCursor(pickInfo) {
     cursor.mesh.isVisible = false;
     cursor.curRoomId = undefined;
 
-    if (!pickInfo || !pickInfo.hit || (cursor.mode !== CursorModes.Add && pickInfo.pickedMesh === groundMesh)) return;
+    if (!pickInfo || !pickInfo.hit) return;
     var mesh = pickInfo.pickedMesh;
     var faceId = pickInfo.faceId;
     var point = pickInfo.pickedPoint;
 
-    var meshName = mesh.name || mesh.sourceMesh.source.name;
+    // var meshName = mesh.name || mesh.sourceMesh.source.name;
     // console.log('id: ' + mesh.id + ', source mesh: ' + meshName + ', faceId: ' + faceId);
     // console.log(mesh);
 
@@ -479,12 +485,6 @@ function updateCursor(pickInfo) {
 
         // todo: improve cursor resolution for floors, planes etc
         var cursorPos = point.add(normal.scale(0.75));
-        // hacky fix for floors
-        // hm actually i tihnk it is moreintuitive when the floors are ignored
-        // if (mesh.sourceMesh.source.name === 'floor') {
-        //     cursorPos.y = cursorPos.y + 1;
-        // }
-        // console.log('cursorPos: ' + cursorPos);
 
         var cursorPosRounded = BABYLON.Vector3.FromArray(cursorPos.asArray().map(i => Math.round(i)));
         // console.log('cursorPosRounded: ' + cursorPosRounded);
@@ -512,7 +512,9 @@ function updateCursor(pickInfo) {
 
         // if the cursor resolves into an existing room,
         // check if the space in this room is already occupied
-        if (cursor.curRoomId && !isCellFree(room[cursor.curRoomId], cursor.roomX, cursor.roomY)) {
+        // check if there is an empty space for a tile and for item/sprite
+        // return depending on what type of the drawing is currently selected as a brush
+        if (cursor.curRoomId && !canPlaceDrawing(room[cursor.curRoomId], cursor.roomX, cursor.roomY)) {
             // console.log("can't place the cursor: the cell isn't empty");
             return;
         }
@@ -531,9 +533,6 @@ function updateCursor(pickInfo) {
 
         cursor.mesh.position = mesh.absolutePosition;
 
-        // hm actually this can be done when the action is performed
-        // no need to fetch a bitsy drawing every frame when it's only needed
-        // when you are clicking
         cursor.pickedMesh = mesh;
 
         cursor.isValid = true;
@@ -541,15 +540,18 @@ function updateCursor(pickInfo) {
     }
 }
 
-function isCellFree(room, x, y) {
+function canPlaceDrawing(room, x, y) {
     // use 3d hack's 'sprites' object that already keeps track of
     // all sprites that are currently in the scene
-    return room.tilemap[y][x] === '0' &&
-           !(room.items.find(i => i.x === x && i.y === y)) &&
-           !(Object.keys(sprites).find((id) => {
+    if (bitsy.drawing.type === TileType.Tile) {
+        return room.tilemap[y][x] === '0';
+    } else {
+        return !room.items.find(i => i.x === x && i.y === y) &&
+            !Object.keys(sprites).find((id) => {
                 var s = bitsy.sprite[id]
                 return s.room === room.id && s.x === x && s.y === y;
-           }));
+            });
+    }
 }
 
 function getNormal(mesh, faceId) {
@@ -595,18 +597,6 @@ function getNormal(mesh, faceId) {
     var normal = BABYLON.Vector3.Cross(tempVec1, tempVec0);
     normal.normalize();
 
-    // console.log('before rotation: ' + normal);
-
-    // console.log('mesh rotation: ' + mesh.rotation);
-    // console.log(mesh.absoluteRotationQuaternion); // undefined
-    // console.log(mesh.rotationQuaternion); // null
-    // console.log(mesh.rotation); // funally
-    // and again wtf mesh.absoluteRotationQuaternion is undefined
-    // normal.rotateByQuaternionToRef(new BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, mesh.rotation.y), normal);
-    // console.log('rotateByQuaternionToRef: ' + normal);
-
-
-    // alternative method using world transform matrix, seems to be more straightforward and effecient
     BABYLON.Vector3.TransformNormalToRef(normal, mesh.getWorldMatrix(), normal);
     // console.log('transformed by world matrix: ' + normal);
 
@@ -617,7 +607,17 @@ function render3d() {
     room3dUpdate();
 
     // update cursor
-    if (cursor.shouldUpdate) updateCursor(scene.pick(scene.pointerX, scene.pointerY));
+    if (cursor.shouldUpdate) {
+        updateCursor(scene.pick(
+            scene.pointerX, scene.pointerY,
+            m => {
+                if (cursor.mode !== CursorModes.Add) {
+                    return m.isVisible && m.isPickable && m !== groundMesh;
+                } else {
+                    return m.isVisible && m.isPickable;
+                }
+            }));
+    }
 
     scene.render();
 }
