@@ -257,8 +257,8 @@ function initRoom3d() {
         // do editor actions logic here
         if (!cursor.isValid) return;
         if (cursor.mode === CursorModes.Add) {
-            console.log('going to add new drawing now!');
-            console.log('curRoomId: ' + cursor.curRoomId);
+            // console.log('going to add new drawing now!');
+            // console.log('curRoomId: ' + cursor.curRoomId);
             // console.log(drawing);
             // return if there is no currently selected drawing
             if (!bitsy.drawing) return;
@@ -289,7 +289,7 @@ function initRoom3d() {
             }
 
             if (bitsy.drawing.type === bitsy.TileType.Tile) {
-                console.log('adding new tile');
+                // console.log('adding new tile');
                 bitsy.room[cursor.curRoomId].tilemap[cursor.roomY][cursor.roomX] = bitsy.drawing.id;
             } else if (bitsy.drawing.type === bitsy.TileType.Sprite || bitsy.drawing.type === bitsy.TileType.Avatar) {
                 var s = bitsy.sprite[bitsy.drawing.id];
@@ -303,6 +303,10 @@ function initRoom3d() {
                     mesh.position = cursor.mesh.position;
                     // make sure to reapply additional transformation from tags
                     applyTransformTags(s, mesh);
+                    // update bitsyOrigin object to make sure mouse picking will work correctly
+                    mesh.bitsyOrigin.x = s.x;
+                    mesh.bitsyOrigin.y = s.y;
+                    mesh.bitsyOrigin.roomId = s.room;
                 }
             } else if (bitsy.drawing.type === bitsy.TileType.Item) {
                 bitsy.room[cursor.curRoomId].items.push({
