@@ -47,6 +47,8 @@ cursor.mode = CursorModes.Add;
 cursor.shouldUpdate = false;
 cursor.pickedMesh = null;
 cursor.isMouseDown = false;
+cursor.isAltDown = false;
+cursor.isShiftDown = false;
 
 // track if cursor mode was modified by holding down alt for switching to select mode
 cursor.modeBeforeModified = null;
@@ -239,28 +241,49 @@ function initRoom3d() {
         cursor.shouldUpdate = false;
     });
 
+    // switch cursor mode when starting to hold alt and shift
     canvas3d.addEventListener('keydown', (e) => {
         switch (e.code) {
             case 'AltLeft':
             case 'AltRight':
+                cursor.isAltDown = true;
                 if (cursor.modeBeforeModified === null) {
                     cursor.modeBeforeModified = cursor.mode;
-                    cursor.mode = CursorModes.Select;
+                    if (cursor.isShiftDown) {
+                        cursor.mode = CursorModes.Remove;
+                    } else {
+                        cursor.mode = CursorModes.Select;
+                    }
                 }
-                break
+                break;
+            case 'ShiftLeft':
+            case 'ShiftRight':
+                cursor.isShiftDown = true;
+                if (cursor.isAltDown && cursor.mode === CursorModes.Select) {
+                    cursor.mode = CursorModes.Remove;
+                }
+                break;
         }
     });
 
-    // switch cursor mode with number keys
+    // switch cursor mode with number keys and when releasing alt and shift
     canvas3d.addEventListener('keyup', (e) => {
         switch (e.code) {
             case 'AltLeft':
             case 'AltRight':
+                cursor.isAltDown = false;
                 if (cursor.modeBeforeModified !== null) {
                     cursor.mode = cursor.modeBeforeModified;
                     cursor.modeBeforeModified = null;
                 }
-                break
+                break;
+            case 'ShiftLeft':
+            case 'ShiftRight':
+                cursor.isShiftDown = false;
+                if (cursor.isAltDown && cursor.mode === CursorModes.Remove) {
+                    cursor.mode = CursorModes.Select;
+                }
+                break;
             case 'Digit1':
                 cursor.mode = CursorModes.Add;
                 break;
