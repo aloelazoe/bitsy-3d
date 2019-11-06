@@ -47,6 +47,9 @@ cursor.mode = CursorModes.Add;
 cursor.shouldUpdate = false;
 cursor.pickedMesh = null;
 
+// track if cursor mode was modified by holding down alt for switching to select mode
+cursor.modeBeforeModified = null;
+
 // debug. set this when clicking on the mesh in select mode
 curSelectedMesh = null;
 
@@ -56,21 +59,6 @@ function initRoom3d() {
     console.log(canvas3d);
     canvas3d.width = 512;
     canvas3d.height = 512;
-
-    // switch cursor mode with number keys
-    canvas3d.addEventListener('keyup', (e) => {
-        switch (e.code) {
-            case 'Digit1':
-                cursor.mode = CursorModes.Add;
-                break;
-            case 'Digit2':
-                cursor.mode = CursorModes.Remove;
-                break;
-            case 'Digit3':
-                cursor.mode = CursorModes.Select;
-                break;
-        }
-    });
 
     engine = new BABYLON.Engine(canvas3d, false);
     scene = new BABYLON.Scene(engine);
@@ -248,6 +236,40 @@ function initRoom3d() {
     canvas3d.addEventListener('mouseleave', function (e) {
         // unregister 3d cursor update & mouse picking
         cursor.shouldUpdate = false;
+    });
+
+        canvas3d.addEventListener('keydown', (e) => {
+        switch (e.code) {
+            case 'AltLeft':
+            case 'AltRight':
+                if (cursor.modeBeforeModified === null) {
+                    cursor.modeBeforeModified = cursor.mode;
+                    cursor.mode = CursorModes.Select;
+                }
+                break
+        }
+    });
+
+    // switch cursor mode with number keys
+    canvas3d.addEventListener('keyup', (e) => {
+        switch (e.code) {
+            case 'AltLeft':
+            case 'AltRight':
+                if (cursor.modeBeforeModified !== null) {
+                    cursor.mode = cursor.modeBeforeModified;
+                    cursor.modeBeforeModified = null;
+                }
+                break
+            case 'Digit1':
+                cursor.mode = CursorModes.Add;
+                break;
+            case 'Digit2':
+                cursor.mode = CursorModes.Remove;
+                break;
+            case 'Digit3':
+                cursor.mode = CursorModes.Select;
+                break;
+        }
     });
 
     canvas3d.addEventListener('click', function (e) {
