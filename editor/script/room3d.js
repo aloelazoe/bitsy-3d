@@ -54,7 +54,9 @@ cursor.isShiftDown = false;
 cursor.modeBeforeModified = null;
 
 // debug. set this when clicking on the mesh in select mode
-curSelectedMesh = null;
+var curSelectedMesh = null;
+
+var groundMesh = null;
 
 function initRoom3d() {
     var canvas3d = document.getElementById('room3d');
@@ -75,6 +77,19 @@ function initRoom3d() {
     cursorMat.ambientColor = CursorColors.Green;
     cursorMat.alpha = 0.5;
     cursor.mesh.material = cursorMat;
+
+    // add ground floor mesh
+    groundMesh = BABYLON.MeshBuilder.CreatePlane('ground', {
+        width: bitsy.mapsize,
+        height: bitsy.mapsize,
+    }, scene);
+    transformGeometry(groundMesh, BABYLON.Matrix.Translation(bitsy.mapsize/2 - 0.5, bitsy.mapsize/2 - 0.5, 0.5));
+    transformGeometry(groundMesh, BABYLON.Matrix.RotationX(Math.PI/2));
+    var groundMat = new BABYLON.StandardMaterial('ground material', scene);
+    groundMat.maxSimultaneousLights = 0;
+    groundMat.freeze();
+    groundMat.alpha = 0;
+    groundMesh.material = groundMat;
 
     // create basic resources
     // box and towers
@@ -309,10 +324,7 @@ function initRoom3d() {
         }
     });
 
-    // preventDefaultOnPointerDown = false;
     canvas3d.addEventListener('pointerup', function (e) {
-        // todo: instead of 'click' use mouseup and make sure no operations are attemted
-        // on the frame when the mouse is released after dragging to position the camera
         cursor.isMouseDown = false;
         // continue updating cursor after moving the camera
         cursor.shouldUpdate = true;
@@ -447,12 +459,12 @@ function updateCursor(pickInfo) {
     cursor.mesh.isVisible = false;
     cursor.curRoomId = undefined;
 
-    if (!pickInfo || !pickInfo.hit) return;
+    if (!pickInfo || !pickInfo.hit || (cursor.mode !== CursorModes.Add && pickInfo.pickedMesh === groundMesh)) return;
     var mesh = pickInfo.pickedMesh;
     var faceId = pickInfo.faceId;
     var point = pickInfo.pickedPoint;
 
-    var meshName = mesh.sourceMesh.source.name;
+    var meshName = mesh.name || mesh.sourceMesh.source.name;
     // console.log('id: ' + mesh.id + ', source mesh: ' + meshName + ', faceId: ' + faceId);
     // console.log(mesh);
 
