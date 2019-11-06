@@ -46,6 +46,7 @@ cursor.isValid = false;
 cursor.mode = CursorModes.Add;
 cursor.shouldUpdate = false;
 cursor.pickedMesh = null;
+cursor.isMouseDown = false;
 
 // track if cursor mode was modified by holding down alt for switching to select mode
 cursor.modeBeforeModified = null;
@@ -238,7 +239,7 @@ function initRoom3d() {
         cursor.shouldUpdate = false;
     });
 
-        canvas3d.addEventListener('keydown', (e) => {
+    canvas3d.addEventListener('keydown', (e) => {
         switch (e.code) {
             case 'AltLeft':
             case 'AltRight':
@@ -272,9 +273,26 @@ function initRoom3d() {
         }
     });
 
-    canvas3d.addEventListener('click', function (e) {
+    canvas3d.addEventListener('pointerdown', function (e) {
+        cursor.isMouseDown = true;
+    });
+
+    canvas3d.addEventListener('pointermove', function (e) {
+        // don't update the cursor when moving the camera
+        if (cursor.shouldUpdate && cursor.isMouseDown) {
+            cursor.shouldUpdate = false;
+            cursor.isValid = false;
+            cursor.mesh.isVisible = false;
+        }
+    });
+
+    // preventDefaultOnPointerDown = false;
+    canvas3d.addEventListener('pointerup', function (e) {
         // todo: instead of 'click' use mouseup and make sure no operations are attemted
         // on the frame when the mouse is released after dragging to position the camera
+        cursor.isMouseDown = false;
+        // continue updating cursor after moving the camera
+        cursor.shouldUpdate = true;
 
         // do editor actions logic here
         if (!cursor.isValid) return;
