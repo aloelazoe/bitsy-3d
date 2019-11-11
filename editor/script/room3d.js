@@ -742,15 +742,15 @@ function room3dUpdate() {
     // sprite changes
     Object.entries(sprites).forEach(function (entry) {
         var id = entry[0];
-        var s = bitsy.sprite[id];
         var mesh = entry[1];
-        // remove the sprite if it is no longer in the current stack
-        if (stackPosOfRoom[s.room].stack !== curStack) {
+        // remove the sprite if it is no longer in the current stack or was deleted completely
+        if (!bitsy.sprite[id] || stackPosOfRoom[bitsy.sprite[id].room].stack !== curStack) {
             mesh.dispose();
             mesh = null;
             delete sprites[id];
         } else {
         // update sprite position
+            var s = bitsy.sprite[id];
             mesh.position.x = s.x;
             mesh.position.z = bitsy.mapsize - 1 - s.y;
             mesh.position.y = stackPosOfRoom[s.room].pos;
