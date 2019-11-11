@@ -257,7 +257,7 @@ function initRoom3d() {
     });
 
     // switch cursor mode when starting to hold alt and shift
-    canvas3d.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', (e) => {
         switch (e.code) {
             case 'AltLeft':
             case 'AltRight':
@@ -282,7 +282,7 @@ function initRoom3d() {
     });
 
     // switch cursor mode with number keys and when releasing alt and shift
-    canvas3d.addEventListener('keyup', (e) => {
+    document.addEventListener('keyup', (e) => {
         switch (e.code) {
             case 'AltLeft':
             case 'AltRight':
@@ -298,15 +298,6 @@ function initRoom3d() {
                 if (cursor.isAltDown && cursor.mode === CursorModes.Remove) {
                     cursor.mode = CursorModes.Select;
                 }
-                break;
-            case 'Digit1':
-                cursor.mode = CursorModes.Add;
-                break;
-            case 'Digit2':
-                cursor.mode = CursorModes.Remove;
-                break;
-            case 'Digit3':
-                cursor.mode = CursorModes.Select;
                 break;
         }
     });
