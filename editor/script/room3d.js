@@ -634,7 +634,7 @@ function applyBehaviours(targetMesh, drawing) {
     hackOptions.meshExtraSetup(drawing, targetMesh);
     if (targetMesh.sourceMesh.source.name === 'billboard') {
         targetMesh.billboardMode = hackOptions.getBillboardMode(BABYLON);
-    } else {
+    } else if (!drawing.drw.startsWith('SPR')) {
         targetMesh.freezeWorldMatrix();
     }
 }
@@ -750,10 +750,23 @@ function room3dUpdate() {
 
     // sprite changes
     Object.entries(sprites).forEach(function (entry) {
-        if (stackPosOfRoom[bitsy.sprite[entry[0]].room].stack !== curStack) {
-            entry[1].dispose();
-            entry[1] = null;
-            delete sprites[entry[0]];
+        var id = entry[0];
+        var s = bitsy.sprite[id];
+        var mesh = entry[1];
+        // remove the sprite if it is no longer in the current stack
+        if (stackPosOfRoom[s.room].stack !== curStack) {
+            mesh.dispose();
+            mesh = null;
+            delete sprites[id];
+        } else {
+        // update sprite position
+            mesh.position.x = s.x;
+            mesh.position.z = bitsy.mapsize - 1 - s.y;
+            mesh.position.y = stackPosOfRoom[s.room].pos;
+            mesh.bitsyOrigin.x = s.x;
+            mesh.bitsyOrigin.y = s.y;
+            mesh.bitsyOrigin.roomId = s.room;
+            applyTransformTags(s, mesh);
         }
     });
     Object.values(bitsy.sprite).filter(function (sprite) {
