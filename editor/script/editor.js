@@ -762,8 +762,6 @@ function start() {
 	markerTool.Refresh();
 	roomTool.drawEditMap();
 
-	initRoom3d();
-
 	updateRoomPaletteSelect(); //dumb to have to specify this here --- wrap up room UI method?
 	updateRoomName(); // init the room UI
 

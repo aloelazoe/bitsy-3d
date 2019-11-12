@@ -58,6 +58,8 @@ var curSelectedMesh = null;
 
 var groundMesh = null;
 
+var room3dCaches = {};
+
 function initRoom3d() {
     var canvas3d = document.getElementById('room3d');
     console.log('canvas3d');
@@ -448,7 +450,30 @@ function initRoom3d() {
         bitsy.roomTool.drawEditMap();
         bitsy.updateRoomName();
     };
-}
+
+    // update textures when pallete is changed
+    events.Listen('palette_change', function(event) {
+        if (bitsy.paletteTool) updateColor(bitsy.paletteTool.GetSelectedId());
+        // console.log('palette change event hiya hey');
+    });
+
+    // update texture for the current drawing when editing with paint tool
+    // this relies on event listeners being called in order
+    // it should work in any browser that implements dom3 events
+    document.getElementById('paint').addEventListener('mouseup', function(e) {
+        updateTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
+        console.log('PAINT EVENT');
+    });
+} // initRoom3d()
+
+// hook up init function
+document.addEventListener('DOMContentLoaded', () => {
+    var s = bitsy.start;
+    bitsy.start = function() {
+        s.call();
+        initRoom3d();
+    };
+});
 
 function updateCursor(pickInfo) {
     // assume that cursor isn't in the valid position unless it is proved to be different
@@ -654,8 +679,9 @@ function makeTilesArray(stackSize) {
 }
 
 // cache helper
-function getCache(make) {
+function getCache(cacheName, make) {
     var cache = {};
+    room3dCaches[cacheName] = cache;
     return function (id, args) {
         var cached = cache[id];
         if (cached) {
@@ -666,7 +692,7 @@ function getCache(make) {
     };
 }
 
-var getTextureFromCache = getCache(function (drawing, pal) {
+var getTextureFromCache = getCache('tex', function(drawing, pal) {
     var c = bitsy.renderer.GetImage(drawing, pal);
     // mock tile draw with palette shenanigans
     // to force transparency to take effect
@@ -693,11 +719,11 @@ function getTexture(drawing, pal) {
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
-    var key = `${drw},${col},${pal},${frame}`;
+    var key = `${drw},${frame},${col},${pal}`;
     return getTextureFromCache(key, [drawing, pal]);
 }
 
-var getMaterialFromCache = getCache(function (drawing, pal) {
+var getMaterialFromCache = getCache('mat', function (drawing, pal) {
     var mat = baseMat.clone();
     mat.diffuseTexture = getTexture(drawing, pal);
     mat.freeze();
@@ -708,11 +734,11 @@ function getMaterial(drawing, pal) {
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
-    var key = `${drw},${col},${pal},${frame}`;
+    var key = `${drw},${frame},${col},${pal}`;
     return getMaterialFromCache(key, [drawing, pal]);
 }
 
-var getMeshFromCache = getCache(function (drawing, pal, type) {
+var getMeshFromCache = getCache('mesh', function (drawing, pal, type) {
     var mesh = meshTemplates[type].clone();
     mesh.makeGeometryUnique();
     mesh.isVisible = false;
@@ -731,8 +757,28 @@ function getMesh(drawing, pal) {
     var frame = drawing.animation.frameIndex;
     // include type in the key to account for cases when drawings that link to
     // the same 'drw' need to have different types when using with other hacks
-    var key = `${drw},${col},${pal},${frame},${type}`;
+    var key = `${drw},${frame},${col},${pal},${type}`;
     return getMeshFromCache(key, [drawing, pal, type]);
+}
+
+function removeFromCaches(cachesArr, drw, frame, col, pal) {
+    var r = new RegExp(`${drw || '\\D\\D\\D_\\w+?'},${frame || '\\d*?'},${col || '\\d*?'},${pal || '\\d*'}`);
+    cachesArr.forEach(cache => {
+        Object.keys(cache)
+            .filter(key => r.test(key))
+            .forEach(key => {
+                cache[key].dispose();
+                delete cache[key];
+            });
+    });
+}
+
+function updateColor(pal) {
+    removeFromCaches(Object.values(room3dCaches), null, null, null, pal);
+}
+
+function updateTexture(drw, frame) {
+    removeFromCaches(Object.values(room3dCaches), drw, frame, null, null);
 }
 
 function room3dUpdate() {
