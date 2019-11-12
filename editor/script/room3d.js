@@ -219,30 +219,7 @@ function initRoom3d() {
         });
     }
 
-    // register room stacks here
-    Object.values(bitsy.room).forEach(function (room) {
-        var name = room.name || '';
-        var stackId = '-' + room.id + '-';
-        var stackPos = 0;
-        var tag = name.match(/#stack\(([a-zA-Z]+),(-?\.?\d*\.?\d*)\)/);
-        if (tag) {
-            stackId = tag[1];
-            stackPos = Number(tag[2]) || 0;
-        }
-        roomsInStack[stackId] = roomsInStack[stackId] || []
-        roomsInStack[stackId].push(room.id);
-
-        stackPosOfRoom[room.id] = {
-            stack: stackId,
-            pos: stackPos,
-        };
-    });
-
-    // create tile arrays for stacks
-    // entry[0] is stackId, entry[1] is an array of roomsIds in the stack
-    Object.entries(roomsInStack).forEach(function (entry) {
-        tilesInStack[entry[0]] = makeTilesArray(entry[1].length);
-    });
+    initRoomStacks();
 
     // set the rendering loop function
     engine.runRenderLoop(render3d);
@@ -452,7 +429,7 @@ function initRoom3d() {
     };
 
     // update textures when pallete is changed
-    events.Listen('palette_change', function(event) {
+    bitsy.events.Listen('palette_change', function(event) {
         if (bitsy.paletteTool) updateColor(bitsy.paletteTool.GetSelectedId());
         // console.log('palette change event hiya hey');
     });
@@ -464,6 +441,16 @@ function initRoom3d() {
         updateTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
         console.log('PAINT EVENT');
     });
+
+    bitsy.events.Listen("game_data_change", function() {
+        // since there is no way to tell what exactly was changed, reset everything
+        // reset stack objects
+        roomsInStack = {};
+        stackPosOfRoom = {};
+        initRoomStacks();
+        // clear all caches to force all drawings to reset during the update
+        removeFromCaches(Object.values(room3dCaches));
+    });
 } // initRoom3d()
 
 // hook up init function
@@ -474,6 +461,33 @@ document.addEventListener('DOMContentLoaded', () => {
         initRoom3d();
     };
 });
+
+function initRoomStacks() {
+    // register room stacks here
+    Object.values(bitsy.room).forEach(function (room) {
+        var name = room.name || '';
+        var stackId = '-' + room.id + '-';
+        var stackPos = 0;
+        var tag = name.match(/#stack\(([a-zA-Z]+),(-?\.?\d*\.?\d*)\)/);
+        if (tag) {
+            stackId = tag[1];
+            stackPos = Number(tag[2]) || 0;
+        }
+        roomsInStack[stackId] = roomsInStack[stackId] || []
+        roomsInStack[stackId].push(room.id);
+
+        stackPosOfRoom[room.id] = {
+            stack: stackId,
+            pos: stackPos,
+        };
+    });
+
+    // create tile arrays for stacks
+    // entry[0] is stackId, entry[1] is an array of roomsIds in the stack
+    Object.entries(roomsInStack).forEach(function (entry) {
+        tilesInStack[entry[0]] = makeTilesArray(entry[1].length);
+    });
+}
 
 function updateCursor(pickInfo) {
     // assume that cursor isn't in the valid position unless it is proved to be different
@@ -790,7 +804,7 @@ function room3dUpdate() {
         var id = entry[0];
         var mesh = entry[1];
         // remove the sprite if it is no longer in the current stack or was deleted completely
-        if (!bitsy.sprite[id] || stackPosOfRoom[bitsy.sprite[id].room].stack !== curStack) {
+        if (!bitsy.sprite[id] || !stackPosOfRoom[bitsy.sprite[id].room] || stackPosOfRoom[bitsy.sprite[id].room].stack !== curStack) {
             mesh.dispose();
             mesh = null;
             delete sprites[id];
@@ -851,7 +865,7 @@ function room3dUpdate() {
     // delete irrelevant items
     Object.entries(items).forEach(function (entry) {
         var roomId = entry[0].slice(0, entry[0].indexOf(','));
-        if (stackPosOfRoom[roomId].stack === curStack) {
+        if (stackPosOfRoom[roomId] && stackPosOfRoom[roomId].stack === curStack) {
             // if this item in current stack
             // check if it is still listed its room
             // if so keep it as it is and return
