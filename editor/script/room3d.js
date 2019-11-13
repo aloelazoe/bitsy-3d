@@ -20,10 +20,9 @@ var curStack;
 
 var lastRoom;
 
-var tilesInStack = {};
-
 var sprites = {};
 var items = {};
+var tiles = {};
 
 var CursorModes = {
     Add: 0,
@@ -325,12 +324,6 @@ function initRoom3d() {
                     stack: curStack,
                     pos: cursor.mesh.position.y,
                 };
-                // initialize a new layer of tile mesh placeholders
-                tilesInStack[curStack].forEach((row) => {
-                    row.forEach((coln) => {
-                        coln.push(['-1', null]);
-                    });
-                });
             }
 
             if (bitsy.drawing.type === bitsy.TileType.Tile) {
@@ -391,23 +384,25 @@ function initRoom3d() {
                 // this function relies on bitsy.curRoom to find the drawing
                 bitsy.editDrawingAtCoordinate(bitsyOrigin.x, bitsyOrigin.y);
             } else {
-                // remove the selected drawing from the room data or move sprite
-                switch (bitsyOrigin.type) {
-                    case bitsy.TileType.Avatar:
-                        return;
-                    case bitsy.TileType.Sprite:
-                        bitsy.sprite[bitsyOrigin.id].room = null;
-                        bitsy.sprite[bitsyOrigin.id].x = -1;
-                        bitsy.sprite[bitsyOrigin.id].y = -1;
+                // remove selected drawing from the room data or move sprite
+                var id = bitsyOrigin.drawing.id;
+                switch (bitsyOrigin.drawing.drw.slice(0, 3)) {
+                    case 'SPR':
+                        if (bitsy.playerId === drawing.id) {
+                            return;
+                        }
+                        bitsyOrigin.drawing.room = null;
+                        bitsyOrigin.drawing.x = -1;
+                        bitsyOrigin.drawing.y = -1;
                         // clean up 3d hack's 'sprites'
-                        sprites[bitsyOrigin.id].dispose();
-                        sprites[bitsyOrigin.id] = null;
-                        delete sprites[bitsyOrigin.id];
+                        sprites[id].dispose();
+                        sprites[id] = null;
+                        delete sprites[id];
                         break;
-                    case bitsy.TileType.Item:
+                    case 'ITM':
                         var roomItems = bitsy.room[bitsyOrigin.roomId].items;
                         var itemIndex = roomItems.findIndex((i) => {
-                            return i.id === bitsyOrigin.id &&
+                            return i.id === id &&
                                 i.x === bitsyOrigin.x &&
                                 i.y === bitsyOrigin.y;
                         });
@@ -418,7 +413,7 @@ function initRoom3d() {
                             return;
                         }
                         break;
-                    case bitsy.TileType.Tile:
+                    case 'TIL':
                         bitsy.room[bitsyOrigin.roomId].tilemap[bitsyOrigin.y][bitsyOrigin.x] = '0';
                         break;
                 }
@@ -426,7 +421,7 @@ function initRoom3d() {
         }
         bitsy.roomTool.drawEditMap();
         bitsy.updateRoomName();
-    };
+    }; // scene.onPointerUp()
 
     // update textures when pallete is changed
     bitsy.events.Listen('palette_change', function(event) {
@@ -473,19 +468,13 @@ function initRoomStacks() {
             stackId = tag[1];
             stackPos = Number(tag[2]) || 0;
         }
-        roomsInStack[stackId] = roomsInStack[stackId] || []
+        roomsInStack[stackId] = roomsInStack[stackId] || [];
         roomsInStack[stackId].push(room.id);
 
         stackPosOfRoom[room.id] = {
             stack: stackId,
             pos: stackPos,
         };
-    });
-
-    // create tile arrays for stacks
-    // entry[0] is stackId, entry[1] is an array of roomsIds in the stack
-    Object.entries(roomsInStack).forEach(function (entry) {
-        tilesInStack[entry[0]] = makeTilesArray(entry[1].length);
     });
 }
 
@@ -832,26 +821,7 @@ function room3dUpdate() {
             if (oldMesh) {
                 oldMesh.dispose();
             }
-            newMesh = newMesh.createInstance();
-            newMesh.position.x = sprite.x;
-            newMesh.position.z = bitsy.mapsize - 1 - sprite.y;
-            newMesh.position.y = stackPosOfRoom[sprite.room].pos;
-
-            // 3d editor addition: add new property to correctly determine meshes origin in bitsy-world
-            newMesh.bitsyOrigin = {
-                id: id,
-                x: sprite.x,
-                y: sprite.y,
-                roomId: sprite.room,
-                type: bitsy.TileType.Sprite,
-            };
-
-            if (id === bitsy.playerId) {
-                newMesh.name = 'player';
-                // make sure to correct the type: avatar should not be deleted
-                newMesh.bitsyOrigin.type = bitsy.TileType.Avatar;
-            }
-            applyBehaviours(newMesh, sprite);
+            newMesh = addMeshInstance(newMesh, sprite, sprite.room, sprite.x, sprite.y);
             sprites[id] = oldMesh = newMesh;
         }
     });
@@ -893,83 +863,56 @@ function room3dUpdate() {
                 if (oldMesh) {
                     oldMesh.dispose();
                 }
-                newMesh = newMesh.createInstance();
-                newMesh.position.x = roomItem.x;
-                newMesh.position.z = bitsy.mapsize - 1 - roomItem.y;
-                newMesh.position.y = stackPosOfRoom[roomId].pos;
-
-                // 3d editor addition: add new property to correctly determine meshes origin in bitsy-world
-                newMesh.bitsyOrigin = {
-                    id: roomItem.id,
-                    x: roomItem.x,
-                    y: roomItem.y,
-                    roomId: roomId,
-                    type: bitsy.TileType.Item,
-                };
-
-                applyBehaviours(newMesh, item);
+                newMesh = addMeshInstance(newMesh, item, roomId, roomItem.x, roomItem.y);
                 items[key] = newMesh;
             }
         });
     });
 
-    // tile changes
-    // check if we entered a new stack
-    // if so make sure tiles from the old stack aren't visible
-    if (lastStack && lastStack !== curStack) {
-        tilesInStack[lastStack].forEach(function (row) {
-            row.forEach(function (coln) {
-                coln.forEach(function (tileEntry) {
-                    if (tileEntry[1] !== null) {
-                        tileEntry[1].dispose();
-                        tileEntry[1] = null;
+    // updated tiles logic
+    // first clear the tiles from rooms that are not in the current stack
+    Object.keys(tiles)
+        .filter(function(roomId) {return roomsInStack[curStack].indexOf(roomId) === -1})
+        .forEach(function(roomId) {
+            tiles[roomId].forEach(function (row) {
+                row.forEach(function (tileMesh) {
+                    if (tileMesh !== null) {
+                        tileMesh.dispose();
                     }
                 });
             });
+            delete tiles[roomId];
         });
-    }
 
-    roomsInStack[curStack].forEach(function (roomId, roomIdIndex) {
-        var tilemap = bitsy.room[roomId].tilemap;
-        for (var y = 0; y < tilemap.length; ++y) {
-            var row = tilemap[y];
-            for (var x = 0; x < row.length; ++x) {
-                var roomTile = row[x];
-                var tile = tilesInStack[curStack][y][x][roomIdIndex];
-                tile[0] = roomTile;
-                var oldMesh = tile[1];
-                if (roomTile === '0') {
+    // iterate throught tilemaps of rooms in the current stack
+    // and update 3d scene objects accordingly
+    roomsInStack[curStack].forEach(function (roomId) {
+        if (!tiles[roomId]) {
+            // generate empty 2d array for meshes
+            tiles[roomId] = bitsy.room[roomId].tilemap.map(function(row) {
+                return row.map(function(tileId) {
+                    return null;
+                });
+            });
+        }
+        bitsy.room[roomId].tilemap.forEach(function(row, y) {
+            row.forEach(function(tileId, x) {
+                var oldMesh = tiles[roomId][y][x];
+                var newMesh = null;
+                if (tileId !== '0') {
+                    newMesh = getMesh(bitsy.tile[tileId], bitsy.curPal());
+                }
+                if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
                     if (oldMesh) {
                         oldMesh.dispose();
                     }
-                    tile[1] = null;
-                    continue;
+                    if (newMesh) {
+                        newMesh = addMeshInstance(newMesh, bitsy.tile[tileId], roomId, x, y);
+                    }
+                    tiles[roomId][y][x] = newMesh;
                 }
-                var newMesh = getMesh(bitsy.tile[roomTile], bitsy.curPal());
-                if (newMesh === (oldMesh && oldMesh.sourceMesh)) {
-                    continue;
-                }
-                newMesh = newMesh.createInstance();
-                newMesh.position.x = x;
-                newMesh.position.z = bitsy.mapsize - 1 - y;
-                newMesh.position.y = stackPosOfRoom[roomId].pos;
-
-                // 3d editor addition: add new property to correctly determine meshes origin in bitsy-world
-                newMesh.bitsyOrigin = {
-                    id: roomTile,
-                    x: x,
-                    y: y,
-                    roomId: roomId,
-                    type: bitsy.TileType.Tile,
-                };
-
-                applyBehaviours(newMesh, bitsy.tile[roomTile]);
-                if (oldMesh) {
-                    oldMesh.dispose();
-                }
-                tile[1] = newMesh;
-            }
-        }
+            });
+        });
     });
 
     // bg changes
@@ -979,6 +922,26 @@ function room3dUpdate() {
     // remember what stack we were in in this frame
     lastStack = curStack;
     lastRoom = bitsy.curRoom;
+}
+
+function addMeshInstance(mesh, drawing, roomId, x, y) {
+    instance = mesh.createInstance();
+    instance.position.x = x;
+    instance.position.z = bitsy.mapsize - 1 - y;
+    instance.position.y = stackPosOfRoom[roomId].pos;
+
+    // // 3d editor addition:
+    // // bitsyOrigin property to correctly determine corresponding bitsy drawing when mouse-picking
+    instance.bitsyOrigin = {
+        drawing: drawing,
+        x: x,
+        y: y,
+        roomId: roomId,
+    };
+
+    applyBehaviours(instance, drawing);
+
+    return instance;
 }
 
 function getColor(colorId) {
