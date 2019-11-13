@@ -353,7 +353,7 @@ function initRoom3d() {
                     y: cursor.roomY,
                 });
             }
-            bitsy.curRoom = cursor.curRoomId;
+            bitsy.selectRoom(cursor.curRoomId);
             bitsy.refreshGameData();
         // if cursor mode is 'select' or 'remove' picked mesh is not falsy
         } else if (cursor.pickedMesh) {
@@ -372,7 +372,7 @@ function initRoom3d() {
             console.log('bitsy origin:');
             console.log(bitsyOrigin);
 
-            bitsy.curRoom = bitsyOrigin.roomId;
+            bitsy.selectRoom(bitsyOrigin.roomId);
 
             // i could infer what drawing it is from the position of the cursor
             // but there could be cases when a mesh can be pushed outside of its bitsy cell using transform tags
@@ -445,7 +445,23 @@ function initRoom3d() {
         initRoomStacks();
         // clear all caches to force all drawings to reset during the update
         removeFromCaches(Object.values(room3dCaches));
+        // this fixes 3d editor crash when removing rooms right after modifying game data
+        bitsy.selectRoom(bitsy.curRoom);
     });
+
+    // patch delete room function
+    var deleteRoomOrig = bitsy.deleteRoom;
+    bitsy.deleteRoom = function() {
+        var deletedRoom = bitsy.curRoom;
+        deleteRoomOrig.call();
+        // check if the room was actually deleted after the dialog
+        if (bitsy.curRoom !== deletedRoom) {
+            if (!stackPosOfRoom[deletedRoom]) return;
+            var stack = stackPosOfRoom[deletedRoom].stack;
+            roomsInStack[stack].splice(roomsInStack[stack].indexOf(deletedRoom), 1);
+            delete stackPosOfRoom[deletedRoom];
+        }
+    }
 } // initRoom3d()
 
 // hook up init function
@@ -699,10 +715,10 @@ var getTextureFromCache = getCache('tex', function(drawing, pal) {
     var c = bitsy.renderer.GetImage(drawing, pal);
     // mock tile draw with palette shenanigans
     // to force transparency to take effect
-    var p = bitsy.getRoomPal(bitsy.player().room);
-    bitsy.room[bitsy.player().room].pal = pal;
+    var p = bitsy.curPal();
+    bitsy.room[bitsy.curRoom].pal = pal;
     bitsy.drawTile(c, 0, 0, fakeContext);
-    bitsy.room[bitsy.player().room].pal = p;
+    bitsy.room[bitsy.curRoom].pal = p;
 
     var tex = new BABYLON.DynamicTexture('test', {
         width: c.width,
