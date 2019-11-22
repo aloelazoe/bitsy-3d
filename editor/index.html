@@ -18,6 +18,9 @@
 		<!-- GENERATED -->
 		<script src="script/generated/resources.js"></script>
 
+		<!-- 3D EDITOR DEPENDENCIES -->
+		<script src="libs/babylon.js"></script>
+
 		<!-- ENGINE SCRIPTS -->
 		<script src="script/engine/color_util.js"></script>
 		<script src="script/engine/font.js"></script>
@@ -26,6 +29,9 @@
 		<script src="script/engine/dialog.js"></script>
 		<script src="script/engine/renderer.js"></script>
 		<script src="script/engine/bitsy.js"></script>
+
+		<!-- 3D EDITOR -->
+		<script src="script/room3d.js"></script>
 
 		<!-- EDITOR SCRIPTS -->
 		<script src="script/paint.js"></script>
@@ -97,6 +103,12 @@
 				<label title="show / hide room window" for="roomCheck">
 					<i class="material-icons">grid_on</i>
 					<span class="localize room_tool_name">room</span>
+				</label>
+
+				<input type="checkbox" value="room3dPanel" id="room3dCheck" onclick="togglePanelAnimated(event);" checked/>
+				<label title="show / hide 3d editor window" for="room3dCheck">
+					<i class="material-icons">grid_on</i>
+					<span>3d editor</span>
 				</label>
 
 				<input type="checkbox" value="exitsPanel" id="exitsCheck" onclick="togglePanelAnimated(event);" />
@@ -257,6 +269,21 @@
 							<a target="_blank" href="https://github.com/le-doux/bitsy">source code</a>
 						</p>
 					</div>
+				</div>
+
+				<div id="room3dPanel" class="panel">
+					<div class="bar">
+						<button title="minimize 3d editor window" class="light panelBarClose" onclick="hidePanel('room3dPanel');">
+							<i class="material-icons">close</i>
+						</button>
+
+						<div title="3d editor window" class="panelBarTitle" onmousedown="grabCard(event);">
+							<i class="material-icons">grid_on</i>
+							<span>3d editor</span>
+						</div>
+					</div>
+
+					<canvas id="room3d"></canvas>
 				</div>
 
 				<div id="roomPanel" class="panel">
