@@ -312,18 +312,18 @@ function initRoom3d() {
                 // if a new room should be added, create it and update the curRoomId on the cursor
                 // also make sure new room is integrated in the current stack data
 
+                // if current room is a stray room without a stack, new stack should be created
+                // and the current room should be added to it
+                if (!curStack) {
+                    curStack = newStackId();
+                    addRoomToStack(bitsy.curRoom, curStack, 0);
+                }
+
                 // note: this function sets bitsy.curRoom to newly created room
                 bitsy.newRoom();
                 var newRoomId = bitsy.curRoom;
-                bitsy.room[newRoomId].name = `#stack(${curStack},${cursor.mesh.position.y})`;
-                bitsy.updateNamesFromCurData();
-
+                addRoomToStack(newRoomId, curStack, cursor.mesh.position.y);
                 cursor.curRoomId = newRoomId;
-                roomsInStack[curStack].push(newRoomId);
-                stackPosOfRoom[newRoomId] = {
-                    stack: curStack,
-                    pos: cursor.mesh.position.y,
-                };
             }
 
             if (bitsy.drawing.type === bitsy.TileType.Tile) {
@@ -473,25 +473,70 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 });
 
+// stack helper functions
 function initRoomStacks() {
     // register room stacks here
     Object.values(bitsy.room).forEach(function (room) {
         var name = room.name || '';
-        var stackId = '-' + room.id + '-';
-        var stackPos = 0;
         var tag = name.match(/#stack\(([a-zA-Z]+),(-?\.?\d*\.?\d*)\)/);
         if (tag) {
-            stackId = tag[1];
-            stackPos = Number(tag[2]) || 0;
+            registerRoomInStack(room.id, tag[1], Number(tag[2]) || 0);
         }
-        roomsInStack[stackId] = roomsInStack[stackId] || [];
-        roomsInStack[stackId].push(room.id);
-
-        stackPosOfRoom[room.id] = {
-            stack: stackId,
-            pos: stackPos,
-        };
     });
+}
+
+function addRoomToStack(roomId, stackId, pos) {
+    var room = bitsy.room[roomId];
+    var tag = `#stack(${stackId},${pos})`;
+    room.name = room.name && ' ' + tag || tag;
+    bitsy.updateNamesFromCurData();
+    registerRoomInStack(roomId, stackId, pos);
+}
+
+function registerRoomInStack(roomId, stackId, pos) {
+    roomsInStack[stackId] = roomsInStack[stackId] || [];
+    roomsInStack[stackId].push(roomId);
+    stackPosOfRoom[roomId] = {
+        stack: stackId,
+        pos: pos,
+    };
+}
+
+function newStackId() {
+    // generate valid stack id
+    // for now only use letters
+    // this will ensure compatibility with current version of 3d hack
+
+    function makeLetters(charCodes) {
+        return charCodes.map(function(c) {
+            return String.fromCharCode(c);
+        }).join('');
+    }
+
+    function increment(arr, min, max) {
+        for (var i = arr.length - 1; i >= 0; i--) {
+            arr[i] = arr[i] + 1;
+            if (arr[i] === max + 1) {
+                if (i > 0) {
+                    arr[i] = min;
+                    continue;
+                } else {            
+                    var newLength = arr.length + 1;
+                    for (var n = 0; n < newLength; n++) {
+                        arr[n] = min;
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    // charcodes from 97 to 122 represent letters from 'a' to 'z'
+    var id = [97];
+    while (Object.keys(roomsInStack).indexOf(makeLetters(id)) !== -1) {
+        increment(id, 97, 122);
+    }
+    return makeLetters(id);
 }
 
 function updateCursor(pickInfo) {
@@ -543,9 +588,9 @@ function updateCursor(pickInfo) {
         }
 
         // figure out if there is an existing room in the stack at appropriate level
-        cursor.curRoomId = roomsInStack[curStack].find((roomId) => {
+        cursor.curRoomId = curStack && roomsInStack[curStack].find((roomId) => {
             return stackPosOfRoom[roomId].pos === cursor.mesh.position.y;
-        });
+        }) || (cursor.mesh.position.y === 0) && bitsy.curRoom;
 
         // console.log('cursor.curRoomId: ' + cursor.curRoomId);
 
@@ -802,42 +847,47 @@ function updateTexture(drw, frame) {
 
 function room3dUpdate() {
     // console.log("update called");
-    curStack = stackPosOfRoom[bitsy.curRoom].stack;
+    curStack = stackPosOfRoom[bitsy.curRoom] && stackPosOfRoom[bitsy.curRoom].stack || null;
 
     // sprite changes
     Object.entries(sprites).forEach(function (entry) {
         var id = entry[0];
         var mesh = entry[1];
+        var s = bitsy.sprite[id];
         // remove the sprite if it is no longer in the current stack or was deleted completely
-        if (!bitsy.sprite[id] || !stackPosOfRoom[bitsy.sprite[id].room] || stackPosOfRoom[bitsy.sprite[id].room].stack !== curStack) {
+        if (!s ||
+        curStack && (!stackPosOfRoom[s.room] || stackPosOfRoom[s.room].stack !== curStack) ||
+        bitsy.curRoom !== s.room) {
             mesh.dispose();
             mesh = null;
             delete sprites[id];
         } else {
         // update sprite position
-            var s = bitsy.sprite[id];
             mesh.position.x = s.x;
             mesh.position.z = bitsy.mapsize - 1 - s.y;
-            mesh.position.y = stackPosOfRoom[s.room].pos;
+            mesh.position.y = curStack && stackPosOfRoom[s.room].pos || 0;
             mesh.bitsyOrigin.x = s.x;
             mesh.bitsyOrigin.y = s.y;
             mesh.bitsyOrigin.roomId = s.room;
             applyTransformTags(s, mesh);
         }
     });
-    Object.values(bitsy.sprite).filter(function (sprite) {
-        // make sure 'stackPosOfRoom[sprite.room]' is defined to account for cases when
-        // the sprites refer to deleted rooms
-        return stackPosOfRoom[sprite.room] && stackPosOfRoom[sprite.room].stack === curStack;
-    }).forEach(function (sprite) {
-        var id = sprite.id;
+    Object.values(bitsy.sprite).filter(function (s) {
+        // go through bitsy sprites and get those that should be currently displayed
+        // account for cases when sprites refer to
+        // * deleted rooms
+        // * stray rooms
+        return stackPosOfRoom[s.room] && stackPosOfRoom[s.room].stack === curStack || s.room === bitsy.curRoom;
+        // return stackPosOfRoom[s.room] && stackPosOfRoom[s.room].stack === curStack;
+    }).forEach(function (s) {
+        var id = s.id;
         var oldMesh = sprites[id];
-        var newMesh = getMesh(sprite, bitsy.curPal());
+        var newMesh = getMesh(s, bitsy.curPal());
         if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
             if (oldMesh) {
                 oldMesh.dispose();
             }
-            newMesh = addMeshInstance(newMesh, sprite, sprite.room, sprite.x, sprite.y);
+            newMesh = addMeshInstance(newMesh, s, s.room, s.x, s.y);
             sprites[id] = oldMesh = newMesh;
         }
     });
@@ -851,7 +901,7 @@ function room3dUpdate() {
     // delete irrelevant items
     Object.entries(items).forEach(function (entry) {
         var roomId = entry[0].slice(0, entry[0].indexOf(','));
-        if (stackPosOfRoom[roomId] && stackPosOfRoom[roomId].stack === curStack) {
+        if (stackPosOfRoom[roomId] && stackPosOfRoom[roomId].stack === curStack || roomId === bitsy.curRoom) {
             // if this item in current stack
             // check if it is still listed its room
             // if so keep it as it is and return
@@ -869,7 +919,7 @@ function room3dUpdate() {
     });
 
     // make/update relevant items
-    roomsInStack[curStack].forEach(function (roomId) {
+    (roomsInStack[curStack] || [bitsy.curRoom]).forEach(function (roomId) {
         bitsy.room[roomId].items.forEach(function (roomItem) {
             var key = `${roomId},${roomItem.id},${roomItem.x},${roomItem.y}`;
             var item = bitsy.item[roomItem.id];
@@ -886,9 +936,11 @@ function room3dUpdate() {
     });
 
     // updated tiles logic
-    // first clear the tiles from rooms that are not in the current stack
+    // first clear the tiles from rooms that should not be currently displayed
     Object.keys(tiles)
-        .filter(function(roomId) {return roomsInStack[curStack].indexOf(roomId) === -1})
+        .filter(function(roomId) {
+            return curStack && roomsInStack[curStack].indexOf(roomId) === -1 || roomId !== bitsy.curRoom;
+        })
         .forEach(function(roomId) {
             tiles[roomId].forEach(function (row) {
                 row.forEach(function (tileMesh) {
@@ -902,7 +954,7 @@ function room3dUpdate() {
 
     // iterate throught tilemaps of rooms in the current stack
     // and update 3d scene objects accordingly
-    roomsInStack[curStack].forEach(function (roomId) {
+    (roomsInStack[curStack] || [bitsy.curRoom]).forEach(function (roomId) {
         if (!tiles[roomId]) {
             // generate empty 2d array for meshes
             tiles[roomId] = bitsy.room[roomId].tilemap.map(function(row) {
@@ -944,7 +996,7 @@ function addMeshInstance(mesh, drawing, roomId, x, y) {
     instance = mesh.createInstance();
     instance.position.x = x;
     instance.position.z = bitsy.mapsize - 1 - y;
-    instance.position.y = stackPosOfRoom[roomId].pos;
+    instance.position.y = stackPosOfRoom[roomId] && stackPosOfRoom[roomId].pos || 0;
 
     // // 3d editor addition:
     // // bitsyOrigin property to correctly determine corresponding bitsy drawing when mouse-picking
