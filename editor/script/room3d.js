@@ -862,15 +862,9 @@ function room3dUpdate() {
         var id = entry[0];
         var mesh = entry[1];
         var s = bitsy.sprite[id];
-        // remove the sprite if it is no longer in the current stack or was deleted completely
-        if (!s ||
-        curStack && (!stackPosOfRoom[s.room] || stackPosOfRoom[s.room].stack !== curStack) ||
-        bitsy.curRoom !== s.room) {
-            mesh.dispose();
-            mesh = null;
-            delete sprites[id];
-        } else {
-        // update sprite position
+        if (s && isRoomVisible(s.room)) {
+        // if the sprite still exits, is in the current room or in the current stack
+        // update sprite's position
             mesh.position.x = s.x;
             mesh.position.z = bitsy.mapsize - 1 - s.y;
             mesh.position.y = curStack && stackPosOfRoom[s.room].pos || 0;
@@ -878,15 +872,16 @@ function room3dUpdate() {
             mesh.bitsyOrigin.y = s.y;
             mesh.bitsyOrigin.roomId = s.room;
             applyTransformTags(s, mesh);
+        } else {
+        // otherwise remove the sprite
+            mesh.dispose();
+            mesh = null;
+            delete sprites[id];
         }
     });
     Object.values(bitsy.sprite).filter(function (s) {
         // go through bitsy sprites and get those that should be currently displayed
-        // account for cases when sprites refer to
-        // * deleted rooms
-        // * stray rooms
-        return stackPosOfRoom[s.room] && stackPosOfRoom[s.room].stack === curStack || s.room === bitsy.curRoom;
-        // return stackPosOfRoom[s.room] && stackPosOfRoom[s.room].stack === curStack;
+        return isRoomVisible(s.room);
     }).forEach(function (s) {
         var id = s.id;
         var oldMesh = sprites[id];
@@ -899,19 +894,14 @@ function room3dUpdate() {
             sprites[id] = oldMesh = newMesh;
         }
     });
-    // make sure the avatar is rendered at the correct height
-    // when they enter new rooms in the stack
-    // if (lastRoom && lastRoom !== bitsy.curRoom) {
-    //     sprites[bitsy.playerId].position.y = stackPosOfRoom[bitsy.curRoom].pos;
-    // }
 
     // item changes
     // delete irrelevant items
     Object.entries(items).forEach(function (entry) {
         var roomId = entry[0].slice(0, entry[0].indexOf(','));
-        if (stackPosOfRoom[roomId] && stackPosOfRoom[roomId].stack === curStack || roomId === bitsy.curRoom) {
-            // if this item in current stack
-            // check if it is still listed its room
+        if (isRoomVisible(roomId)) {
+            // if this item is in the current stack
+            // check if it is still listed in its room
             // if so keep it as it is and return
             if (bitsy.room[roomId].items.find(function (item) {
                     return `${roomId},${item.id},${item.x},${item.y}` === entry[0];
@@ -946,9 +936,7 @@ function room3dUpdate() {
     // updated tiles logic
     // first clear the tiles from rooms that should not be currently displayed
     Object.keys(tiles)
-        .filter(function(roomId) {
-            return curStack && roomsInStack[curStack].indexOf(roomId) === -1 || roomId !== bitsy.curRoom;
-        })
+        .filter(function(roomId) { return !isRoomVisible(roomId) })
         .forEach(function(roomId) {
             tiles[roomId].forEach(function (row) {
                 row.forEach(function (tileMesh) {
@@ -978,7 +966,7 @@ function room3dUpdate() {
                 if (tileId !== '0') {
                     newMesh = getMesh(bitsy.tile[tileId], bitsy.curPal());
                 }
-                if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
+                if (oldMesh !== newMesh && (newMesh !== (oldMesh && oldMesh.sourceMesh)))  {
                     if (oldMesh) {
                         oldMesh.dispose();
                     }
@@ -998,6 +986,11 @@ function room3dUpdate() {
     // remember what stack we were in in this frame
     lastStack = curStack;
     lastRoom = bitsy.curRoom;
+}
+
+function isRoomVisible(roomId) {
+    // true if the room is the current room or we are in the stack and the room is not a stray room and is in the current stack
+    return roomId === bitsy.curRoom || curStack && stackPosOfRoom[roomId] && stackPosOfRoom[roomId].stack === curStack;
 }
 
 function addMeshInstance(mesh, drawing, roomId, x, y) {
