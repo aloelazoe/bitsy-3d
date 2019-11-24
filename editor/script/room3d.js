@@ -456,10 +456,7 @@ function initRoom3d() {
         deleteRoomOrig.call();
         // check if the room was actually deleted after the dialog
         if (bitsy.curRoom !== deletedRoom) {
-            if (!stackPosOfRoom[deletedRoom]) return;
-            var stack = stackPosOfRoom[deletedRoom].stack;
-            roomsInStack[stack].splice(roomsInStack[stack].indexOf(deletedRoom), 1);
-            delete stackPosOfRoom[deletedRoom];
+            unregisterRoomFromStack(deletedRoom);
         }
     }
 } // initRoom3d()
@@ -500,6 +497,17 @@ function registerRoomInStack(roomId, stackId, pos) {
         stack: stackId,
         pos: pos,
     };
+}
+
+function unregisterRoomFromStack(roomId) {
+    if (!stackPosOfRoom[roomId]) return;
+    var stackId = stackPosOfRoom[roomId].stack;
+    roomsInStack[stackId].splice(roomsInStack[stackId].indexOf(roomId), 1);
+    delete stackPosOfRoom[roomId];
+    // delete the stack if it became empty
+    if (roomsInStack[stackId].length === 0) {
+        delete roomsInStack[stackId];
+    }
 }
 
 function newStackId() {
