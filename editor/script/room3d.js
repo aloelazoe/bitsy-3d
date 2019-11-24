@@ -59,6 +59,10 @@ var groundMesh = null;
 
 var room3dCaches = {};
 
+// when false, replace drawing tags won't be applied,
+// and drawings set to have empty meshes will have they regular visible meshes
+var room3dInGamePreviewMode = true;
+
 function initRoom3d() {
     var canvas3d = document.getElementById('room3d');
     console.log('canvas3d');
@@ -789,6 +793,13 @@ var getTextureFromCache = getCache('tex', function(drawing, pal) {
 });
 
 function getTexture(drawing, pal) {
+    console.log('get texture');
+    if (room3dInGamePreviewMode) {
+        // handle drawing replacement tag
+        var altDrawing = parseDrawTag(drawing);
+        drawing = altDrawing && altDrawing || drawing;
+    }
+
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
@@ -1101,6 +1112,37 @@ function applyChildrenTag(drawing, mesh) {
     }
 }
 
+function parseDrawTag(drawing) {
+    // replace drawings marked with the #draw(TYPE,id) tag
+    var name = drawing.name || '';
+    var tag = name.match(/#draw\((TIL|SPR|ITM),([a-zA-Z0-9]+)\)/);
+    if (tag) {
+        var map;
+        // tag[1] is the first capturing group, it can be either TIL, SPR, or ITM
+        switch (tag[1]) {
+            case 'TIL':
+                map = bitsy.tile;
+                break;
+            case 'SPR':
+                map = bitsy.sprite;
+                break;
+            case 'ITM':
+                map = bitsy.item;
+                break;
+            default:
+                break;
+        }
+        // tag[2] is the second capturing group which returns drawing id
+        var id = tag[2];
+        var newDrawing = map[id];
+        if (newDrawing) {
+            return newDrawing;
+        } else {
+            console.error(`couldn't replace ${drawing.name}! there is no '${tag[1]} ${id}'`);
+        }
+    }
+}
+
 var hackOptions = {
     // Determines the resolution of the scene rendered
     // If auto is true, the width/height will be ignored,
@@ -1169,7 +1211,10 @@ var hackOptions = {
         var meshMatch = name.match(/#mesh\((.+?)\)/);
         if (meshMatch) {
             if (meshTemplates[meshMatch[1]]) {
-                return meshMatch[1];
+                // editor addition: ignore empty mesh tag if not in the game preview mode
+                if (room3dInGamePreviewMode || meshMatch[1] !== 'empty') {
+                    return meshMatch[1];
+                }
             } else {
                 // if the specified mesh template doesn't exist,
                 // display error message, but continue execution
