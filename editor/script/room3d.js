@@ -417,6 +417,7 @@ function initRoom3d() {
                         bitsy.room[bitsyOrigin.roomId].tilemap[bitsyOrigin.y][bitsyOrigin.x] = '0';
                         break;
                 }
+                bitsy.refreshGameData();
             }
         }
         bitsy.roomTool.drawEditMap();
