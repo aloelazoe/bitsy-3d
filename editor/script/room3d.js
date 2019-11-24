@@ -1252,3 +1252,58 @@ function selectAdjacentStackOrStrayRoom(direction) {
     }
     bitsy.selectRoom(eligibleRooms[nextIdx]);
 }
+
+function duplicateCurStack() {
+    var roomList = curStack && roomsInStack[curStack] || [bitsy.curRoom];
+    curStack = curStack && newStackId() || null;
+    roomList.forEach(function(roomId) {
+        bitsy.selectRoom(roomId);
+        try {
+            bitsy.duplicateRoom();
+        } catch (err) {
+            // todo: fix that bug in bitsy code? idk
+        }
+        if (curStack) {
+            addRoomToStack(bitsy.curRoom, curStack, stackPosOfRoom[roomId].pos);
+        }
+    });
+}
+
+function deleteCurStack() {
+    if (curStack) {
+        if (Object.keys(roomsInStack).length <= 1 ) {
+            alert("You can't delete your only stack!");
+            return;
+        } else if (!confirm("Are you sure you want to delete this room stack? You can't get it back.")) {
+            return;
+        }
+        // make a copy of the list of rooms to be deleted
+        var roomList = roomsInStack[curStack].slice();
+        roomList.forEach(function(roomId) {
+            // delete exits in _other_ rooms that go to this room
+            for(r in bitsy.room ) {
+                if(r != roomId) {
+                    for(i in bitsy.room[r].exits) {
+                        if(bitsy.room[r].exits[i].dest.room === roomId) {
+                            bitsy.room[r].exits.splice( i, 1 );
+                        }
+                    }
+                }
+            }
+            delete room[roomId];
+            unregisterRoomFromStack(roomId);
+        });
+        bitsy.refreshGameData();
+
+        bitsy.markerTool.Clear();
+        // will it work?
+        selectAdjacentStackOrStrayRoom(1);
+
+        bitsy.roomTool.drawEditMap();
+        bitsy.paintTool.updateCanvas();
+        bitsy.updateRoomPaletteSelect();
+        bitsy.markerTool.Refresh();
+    } else {
+        bitsy.deleteRoom();
+    }
+}
