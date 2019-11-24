@@ -1231,56 +1231,24 @@ var hackOptions = {
 // hook up ui controls for editor panel
 function selectAdjacentStackOrStrayRoom(direction) {
     // direction should be 1 or -1
+    // get every first room from every stack and then every stray room
+    // and make a list of all rooms we can switch between
+    var eligibleRooms = Object.values(roomsInStack)
+        .map(function(roomList) {
+            return roomList[0]; 
+        })
+        .concat(Object.keys(bitsy.room).filter(function(roomId){
+            return !stackPosOfRoom[roomId];
+        }));
+    var curIdx;
     if (curStack) {
-        // if curStack is defined we should be browsing through stacks
-        selectAdjacentStack(direction);
+        curIdx = Object.keys(roomsInStack).indexOf(curStack);
     } else {
-        // if curStack is null or undefined we should be browsing through stray rooms
-        selectAdjacentStrayRoom(direction);
+        curIdx = eligibleRooms.indexOf(bitsy.curRoom);
     }
-}
-
-function selectAdjacentStack(direction) {
-    // direction should be 1 or -1
-    var stackArr = Object.keys(roomsInStack);
-    var nextStackIdx;
-    if (curStack) {
-        nextStackIdx = stackArr.indexOf(curStack) + direction;
-    } else {
-        // if curStack is undefined, we might be coming here when viewing a stray room
-        // and should select either the first or the last index depending on the direction
-        nextStackIdx = direction < 0 && stackArr.length + direction || 0;
+    var nextIdx = (curIdx + direction) % eligibleRooms.length;
+    if (nextIdx < 0) {
+        nextIdx = eligibleRooms.length - 1;
     }
-    
-    if (nextStackIdx >= stackArr.length || nextStackIdx < 0) {
-        // select adjacent stray room instead. pass along the direction
-        selectAdjacentStrayRoom(direction);
-    } else {
-        bitsy.selectRoom(roomsInStack[stackArr[nextStackIdx]][0]);
-    }
-}
-
-function selectAdjacentStrayRoom(direction) {
-    // direction should be 1 or -1
-    // find the next stray room to swith to
-    // if it loops over to the first stray room, select adjacent stack instead
-    var strayRoomsArr = Object.keys(bitsy.room).filter(function(roomId){
-        return !stackPosOfRoom[roomId];
-    });
-    var strayRoomIdx = strayRoomsArr.indexOf(bitsy.curRoom);
-    var nextStrayRoomIdx;
-    if (strayRoomIdx === -1) {
-        // if current room is not a stray room, we are coming here when viewing a stack
-        // and should select either the first or the last index depending on the direction
-        nextStrayRoomIdx = direction < 0 && strayRoomsArr.length + direction || 0;
-    } else {
-        nextStrayRoomIdx = strayRoomIdx + direction;
-    }
-
-    if (nextStrayRoomIdx >= strayRoomsArr.length || nextStrayRoomIdx < 0) {
-        // select adjacent stack instead. pass along the direction
-        selectAdjacentStack(direction);
-    } else {
-        bitsy.selectRoom(strayRoomsArr[nextStrayRoomIdx]);
-    }
+    bitsy.selectRoom(eligibleRooms[nextIdx]);
 }
