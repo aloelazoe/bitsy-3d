@@ -235,7 +235,7 @@ function initRoom3d() {
     });
 
     // switch cursor mode when starting to hold alt and shift
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', function(e) {
         switch (e.code) {
             case 'AltLeft':
             case 'AltRight':
@@ -260,7 +260,7 @@ function initRoom3d() {
     });
 
     // switch cursor mode with number keys and when releasing alt and shift
-    document.addEventListener('keyup', (e) => {
+    document.addEventListener('keyup', function(e) {
         switch (e.code) {
             case 'AltLeft':
             case 'AltRight':
@@ -401,7 +401,7 @@ function initRoom3d() {
                         break;
                     case 'ITM':
                         var roomItems = bitsy.room[bitsyOrigin.roomId].items;
-                        var itemIndex = roomItems.findIndex((i) => {
+                        var itemIndex = roomItems.findIndex(function(i) {
                             return i.id === id &&
                                 i.x === bitsyOrigin.x &&
                                 i.y === bitsyOrigin.y;
@@ -462,7 +462,7 @@ function initRoom3d() {
 } // initRoom3d()
 
 // hook up init function
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     var s = bitsy.start;
     bitsy.start = function() {
         s.call();
@@ -578,7 +578,7 @@ function updateCursor(pickInfo) {
         var dotProduct = BABYLON.Vector3.Dot(pickInfo.ray.direction, normal);
         var cursorPos = point.add(normal.scale(0.75 * -Math.sign(dotProduct)));
 
-        var cursorPosRounded = BABYLON.Vector3.FromArray(cursorPos.asArray().map(i => Math.round(i)));
+        var cursorPosRounded = BABYLON.Vector3.FromArray(cursorPos.asArray().map(function(i) {return Math.round(i);}));
         // console.log('cursorPosRounded: ' + cursorPosRounded);
 
         cursor.mesh.position = cursorPosRounded;
@@ -596,7 +596,7 @@ function updateCursor(pickInfo) {
         }
 
         // figure out if there is an existing room in the stack at appropriate level
-        cursor.curRoomId = curStack && roomsInStack[curStack].find((roomId) => {
+        cursor.curRoomId = curStack && roomsInStack[curStack].find(function(roomId) {
             return stackPosOfRoom[roomId].pos === cursor.mesh.position.y;
         }) || (cursor.mesh.position.y === 0) && bitsy.curRoom;
 
@@ -638,8 +638,8 @@ function canPlaceDrawing(room, x, y) {
     if (bitsy.drawing.type === TileType.Tile) {
         return room.tilemap[y][x] === '0';
     } else {
-        return !room.items.find(i => i.x === x && i.y === y) &&
-            !Object.keys(sprites).find((id) => {
+        return !room.items.find(function(i) {return i.x === x && i.y === y;}) &&
+            !Object.keys(sprites).find(function(id) {
                 var s = bitsy.sprite[id]
                 return s.room === room.id && s.x === x && s.y === y;
             });
@@ -702,7 +702,7 @@ function render3d() {
     if (cursor.shouldUpdate) {
         updateCursor(scene.pick(
             scene.pointerX, scene.pointerY,
-            m => {
+            function(m) {
                 if (cursor.mode !== CursorModes.Add) {
                     return m.isVisible && m.isPickable && m !== groundMesh;
                 } else {
@@ -835,10 +835,10 @@ function getMesh(drawing, pal) {
 
 function removeFromCaches(cachesArr, drw, frame, col, pal) {
     var r = new RegExp(`${drw || '\\D\\D\\D_\\w+?'},${frame || '\\d*?'},${col || '\\d*?'},${pal || '\\d*'}`);
-    cachesArr.forEach(cache => {
+    cachesArr.forEach(function(cache) {
         Object.keys(cache)
-            .filter(key => r.test(key))
-            .forEach(key => {
+            .filter(function(key) {return r.test(key);})
+            .forEach(function(key) {
                 cache[key].dispose();
                 delete cache[key];
             });
