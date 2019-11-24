@@ -5,12 +5,6 @@ var scene;
 var meshTemplates = {};
 
 var baseMat;
-var textCanvas;
-var textContext;
-var fakeContext = {
-    drawImage: function () {},
-    fillRect: function () {},
-};
 
 var roomsInStack = {};
 var stackPosOfRoom = {};
@@ -770,30 +764,39 @@ function getCache(cacheName, make) {
 }
 
 var getTextureFromCache = getCache('tex', function(drawing, pal) {
-    var c = bitsy.renderer.GetImage(drawing, pal);
-    // mock tile draw with palette shenanigans
-    // to force transparency to take effect
-    var p = bitsy.curPal();
-    bitsy.room[bitsy.curRoom].pal = pal;
-    bitsy.drawTile(c, 0, 0, fakeContext);
-    bitsy.room[bitsy.curRoom].pal = p;
+    var canvas = bitsy.renderer.GetImage(drawing, pal);
+    var ctx = canvas.getContext('2d');
 
     var tex = new BABYLON.DynamicTexture('test', {
-        width: c.width,
-        height: c.height,
+        width: canvas.width,
+        height: canvas.height,
     }, scene, false, BABYLON.Texture.NEAREST_NEAREST_MIPNEAREST);
+
     tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+
     if (hackOptions.isTransparent(drawing)) {
         tex.hasAlpha = true;
+        // from transparent sprites hack
+        // redraw image context with all bg pixels transparent
+        var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var bg = bitsy.getPal(pal)[0];
+        for (let i = 0; i < data.data.length; i += 4) {
+            var r = data.data[i];
+            var g = data.data[i + 1];
+            var b = data.data[i + 2];
+            if (r === bg[0] && g === bg[1] && b === bg[2]) {
+                data.data[i + 3] = 0;
+            }
+        }
+        ctx.putImageData(data, 0, 0);
     }
-    var ctx = tex.getContext();
-    ctx.drawImage(c, 0, 0);
+    var texCtx = tex.getContext();
+    texCtx.drawImage(canvas, 0, 0);
     tex.update();
     return tex;
 });
 
 function getTexture(drawing, pal) {
-    console.log('get texture');
     if (room3dInGamePreviewMode) {
         // handle drawing replacement tag
         var altDrawing = parseDrawTag(drawing);
@@ -1252,8 +1255,8 @@ var hackOptions = {
 
     // function used to adjust mesh instances after they have been added to the scene
     meshExtraSetup: function (drawing, mesh) {
-        applyTransformTags(drawing, mesh);
         applyChildrenTag(drawing, mesh);
+        applyTransformTags(drawing, mesh);
     },
     // smooth moves hack options
     // duration of ease in ms
