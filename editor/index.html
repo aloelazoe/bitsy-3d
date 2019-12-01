@@ -118,6 +118,12 @@
 					<span class="localize marker_tool_name">exits & endings</span>
 				</label>
 
+				<input type="checkbox" value="meshPanel" id="meshCheck" onclick="togglePanelAnimated(event);"  checked/>
+				<label title="show / hide mesh window" for="meshCheck">
+					<i class="material-icons">brush</i>
+					<span>mesh</span>
+				</label>
+
 				<input type="checkbox" value="paintPanel" id="paintCheck" onclick="togglePanelAnimated(event);"  checked/>
 				<label title="show / hide paint window" for="paintCheck">
 					<i class="material-icons">brush</i>
@@ -284,25 +290,47 @@
 						</div>
 					</div>
 
-					<canvas id="room3d"></canvas>
+					<canvas id="room3dCanvas"></canvas>
 
 					<div id="room3dStackControls" class="controlBox">
-							<button title="previous stack" class="color0" onclick="selectAdjacentStackOrStrayRoom(-1);">
-								<i class="navigate_before material-icons"><span>navigate_before</span></i>
-							</button>
-							<button title="next stack" class="color0" onclick="selectAdjacentStackOrStrayRoom(1);">
-								<i class="navigate_next material-icons"><span>navigate_next</span></i>
-							</button>
-							<button title="add new stack" class="color0" onclick="newRoom();">
-								<i class="material-icons">add</i>
-							</button>
-							<button title="duplicate stack" class="color0" onclick="duplicateCurStack();">
-								<i class="material-icons">content_copy</i>
-							</button>
-							<button title="delete stack" class="color0" onclick="deleteCurStack();">
-								<i class="material-icons">remove_circle</i>
-							</button>
-							<span><b>alt</b>: select, <b>alt+shift</b>: remove</span>
+						<button title="previous stack" class="color0" onclick="selectAdjacentStackOrStrayRoom(-1);">
+							<i class="navigate_before material-icons"><span>navigate_before</span></i>
+						</button>
+						<button title="next stack" class="color0" onclick="selectAdjacentStackOrStrayRoom(1);">
+							<i class="navigate_next material-icons"><span>navigate_next</span></i>
+						</button>
+						<button title="add new stack" class="color0" onclick="newRoom();">
+							<i class="material-icons">add</i>
+						</button>
+						<button title="duplicate stack" class="color0" onclick="duplicateCurStack();">
+							<i class="material-icons">content_copy</i>
+						</button>
+						<button title="delete stack" class="color0" onclick="deleteCurStack();">
+							<i class="material-icons">remove_circle</i>
+						</button>
+						<span><b>alt</b>: select, <b>alt+shift</b>: remove</span>
+					</div>
+				</div>
+
+				<div id="meshPanel" class="panel">
+					<div class="bar">
+						<button title="minimize mesh window" class="light panelBarClose" onclick="hidePanel('meshPanel');">
+							<i class="material-icons">close</i>
+						</button>
+
+						<div title="mesh window" class="panelBarTitle" onmousedown="grabCard(event);">
+							<i class="material-icons">brush</i>
+							<span>mesh</span>
+						</div>
+					</div>
+					<div id="meshType" class="controlBox">
+						<span>type</span>:
+						<select title="select mesh type" id="meshTypeSelect" onchange="meshTypeSelectChange();">
+							<!-- options are added dynamically -->
+						</select>
+						<select title="select mesh subtype" id="meshSubTypeSelect" onchange="meshTypeSelectChange();">
+							<!-- options are added dynamically -->
+						</select>
 					</div>
 				</div>
 

@@ -58,7 +58,7 @@ var room3dCaches = {};
 var room3dInGamePreviewMode = true;
 
 function initRoom3d() {
-    var canvas3d = document.getElementById('room3d');
+    var canvas3d = document.getElementById('room3dCanvas');
     console.log('canvas3d');
     console.log(canvas3d);
     canvas3d.width = 512;
@@ -460,13 +460,27 @@ function initRoom3d() {
     }
 } // initRoom3d()
 
-// hook up init function
+// initialize 3d editor
 document.addEventListener('DOMContentLoaded', function() {
+    // hook up init function
     var s = bitsy.start;
     bitsy.start = function() {
         s.call();
         initRoom3d();
+        // set up mesh panel ui after 3d editor data has been initialized
+        meshTypeSelectInit();
     };
+
+    // insert new panels in default prefs
+    bitsy.defaultPanelPrefs.workspace.forEach(function(panel) {
+        if (panel.position > 0) {
+            panel.position = panel.position + 2;
+        }
+    });
+    bitsy.defaultPanelPrefs.workspace.splice(1, 0,
+        { id:"room3dPanel", visible:true, position:1 },
+        { id:"meshPanel", visible:true, position:2 }
+    );
 });
 
 // stack helper functions
@@ -1348,4 +1362,57 @@ function deleteCurStack() {
     } else {
         bitsy.deleteRoom();
     }
+}
+
+// set up and respond to ui elements in mesh panel
+var meshSelectSubTypePrefixes = ['tower'];
+
+function meshTypeSelectInit() {
+    var meshTypeSelectEl = document.getElementById('meshTypeSelect');
+    var meshSubTypeSelectEl = document.getElementById('meshSubTypeSelect');
+
+    Object.keys(meshTemplates).forEach(function(templateName) {
+        // check if the template name needs to be broken down between two select elements
+        meshSelectSubTypePrefixes.forEach(function(p) {
+            if (templateName.startsWith(p)) {
+                var suffix = templateName.slice(p.length);
+                var option = document.createElement('option');
+                option.text = option.value = suffix;
+                meshSubTypeSelectEl.add(option);
+                templateName = p;
+            }
+        });
+        
+        if (Array.prototype.some.call(meshTypeSelectEl.options, function(o) {return o.text === templateName;})) {
+            return;
+        }
+
+        var option = document.createElement('option');
+        option.text = option.value = templateName;
+
+        meshTypeSelectEl.add(option);
+        // todo: set an option as currently selected depending on currently selected drawing
+        // abstract into a separate function
+        // since this would need to be updated whenever a different drawing is selected
+        // option.selected = true;
+    });
+    meshTypeSelectChange();
+}
+
+function meshTypeSelectChange() {
+    var meshTypeSelectEl = document.getElementById('meshTypeSelect');
+    var meshSubTypeSelectEl = document.getElementById('meshSubTypeSelect');
+
+    var curMeshType = meshTypeSelectEl.value;
+
+    meshSelectSubTypePrefixes.forEach(function(p) {
+        if (curMeshType.startsWith(p)) {
+            meshSubTypeSelectEl.setAttribute('style', 'display:initial;');
+            curMeshType += meshSubTypeSelectEl.value;
+        } else {
+            meshSubTypeSelectEl.setAttribute('style', 'display:none;');
+        }
+    });
+
+    console.log('meshTypeSelect changed: ' + curMeshType);
 }
