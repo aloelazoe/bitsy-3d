@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
         s.call();
         initRoom3d();
         // set up mesh panel ui after 3d editor data has been initialized
-        meshTypeSelectInit();
+        meshPanel.init();
     };
 
     // insert new panels in default prefs
@@ -1284,6 +1284,7 @@ var hackOptions = {
     },
 };
 
+// UI
 // hook up ui controls for editor panel
 function selectAdjacentStackOrStrayRoom(direction) {
     // direction should be 1 or -1
@@ -1365,54 +1366,81 @@ function deleteCurStack() {
 }
 
 // set up and respond to ui elements in mesh panel
-var meshSelectSubTypePrefixes = ['tower'];
+var meshPanel = {
+    subTypePrefixes: ['tower'],
 
-function meshTypeSelectInit() {
-    var meshTypeSelectEl = document.getElementById('meshTypeSelect');
-    var meshSubTypeSelectEl = document.getElementById('meshSubTypeSelect');
+    init: function() {
+        // set up type selection
+        var meshTypeSelectEl = document.getElementById('meshTypeSelect');
+        var meshSubTypeSelectEl = document.getElementById('meshSubTypeSelect');
 
-    Object.keys(meshTemplates).forEach(function(templateName) {
-        // check if the template name needs to be broken down between two select elements
-        meshSelectSubTypePrefixes.forEach(function(p) {
-            if (templateName.startsWith(p)) {
-                var suffix = templateName.slice(p.length);
-                var option = document.createElement('option');
-                option.text = option.value = suffix;
-                meshSubTypeSelectEl.add(option);
-                templateName = p;
+        Object.keys(meshTemplates).forEach(function(templateName) {
+            // check if the template name needs to be broken down between two select elements
+            meshPanel.subTypePrefixes.forEach(function(p) {
+                if (templateName.startsWith(p)) {
+                    var suffix = templateName.slice(p.length);
+                    var option = document.createElement('option');
+                    option.text = option.value = suffix;
+                    meshSubTypeSelectEl.add(option);
+                    templateName = p;
+                }
+            });
+            
+            if (Array.prototype.some.call(meshTypeSelectEl.options, function(o) {return o.text === templateName;})) {
+                return;
+            }
+
+            var option = document.createElement('option');
+            option.text = option.value = templateName;
+
+            meshTypeSelectEl.add(option);
+            // todo: set an option as currently selected depending on currently selected drawing
+            // abstract into a separate function
+            // since this would need to be updated whenever a different drawing is selected
+            // option.selected = true;
+        });
+        meshPanel.onChangeType();
+    },
+
+    onChangeType: function() {
+        var meshTypeSelectEl = document.getElementById('meshTypeSelect');
+        var meshSubTypeSelectEl = document.getElementById('meshSubTypeSelect');
+
+        var curMeshType = meshTypeSelectEl.value;
+
+        meshPanel.subTypePrefixes.forEach(function(p) {
+            if (curMeshType.startsWith(p)) {
+                meshSubTypeSelectEl.setAttribute('style', 'display:initial;');
+                curMeshType += meshSubTypeSelectEl.value;
+            } else {
+                meshSubTypeSelectEl.setAttribute('style', 'display:none;');
             }
         });
-        
-        if (Array.prototype.some.call(meshTypeSelectEl.options, function(o) {return o.text === templateName;})) {
-            return;
-        }
 
-        var option = document.createElement('option');
-        option.text = option.value = templateName;
+        console.log('meshTypeSelect changed: ' + curMeshType);
+    },
 
-        meshTypeSelectEl.add(option);
-        // todo: set an option as currently selected depending on currently selected drawing
-        // abstract into a separate function
-        // since this would need to be updated whenever a different drawing is selected
-        // option.selected = true;
-    });
-    meshTypeSelectChange();
-}
+    onChangeTransparency: function() {
+        // body...
+    },
 
-function meshTypeSelectChange() {
-    var meshTypeSelectEl = document.getElementById('meshTypeSelect');
-    var meshSubTypeSelectEl = document.getElementById('meshSubTypeSelect');
-
-    var curMeshType = meshTypeSelectEl.value;
-
-    meshSelectSubTypePrefixes.forEach(function(p) {
-        if (curMeshType.startsWith(p)) {
-            meshSubTypeSelectEl.setAttribute('style', 'display:initial;');
-            curMeshType += meshSubTypeSelectEl.value;
+    onToggleTransform: function() {
+        if ( document.getElementById('meshTransformCheck').checked ) {
+            document.getElementById('meshTransform').setAttribute('style','display:block;');
+            document.getElementById('meshTransformCheckIcon').innerHTML = 'expand_more';
         } else {
-            meshSubTypeSelectEl.setAttribute('style', 'display:none;');
+            document.getElementById('meshTransform').setAttribute('style','display:none;');
+            document.getElementById('meshTransformCheckIcon').innerHTML = 'expand_less';
         }
-    });
+    },
 
-    console.log('meshTypeSelect changed: ' + curMeshType);
-}
+    onToggleChildren: function() {
+        if ( document.getElementById('meshChildrenCheck').checked ) {
+            document.getElementById('meshChildren').setAttribute('style','display:block;');
+            document.getElementById('meshChildrenCheckIcon').innerHTML = 'expand_more';
+        } else {
+            document.getElementById('meshChildren').setAttribute('style','display:none;');
+            document.getElementById('meshChildrenCheckIcon').innerHTML = 'expand_less';
+        }
+    },
+}; // meshPanel

@@ -323,14 +323,64 @@
 							<span>mesh</span>
 						</div>
 					</div>
-					<div id="meshType" class="controlBox">
-						<span>type</span>:
-						<select title="select mesh type" id="meshTypeSelect" onchange="meshTypeSelectChange();">
-							<!-- options are added dynamically -->
-						</select>
-						<select title="select mesh subtype" id="meshSubTypeSelect" onchange="meshTypeSelectChange();">
-							<!-- options are added dynamically -->
-						</select>
+					<canvas id="meshPreviewCanvas" width="256" height="256"></canvas>
+					<div id="meshConfig" class="controlBox">
+						<div id="meshType" title="model to use for displaying currently selected bitsy drawing in 3d">
+							<span>type</span>:
+							<select id="meshTypeSelect" onchange="meshPanel.onChangeType();">
+								<!-- options are added dynamically -->
+							</select>
+							<select title="select subtype" id="meshSubTypeSelect" onchange="meshPanel.onChangeType();">
+								<!-- options are added dynamically -->
+							</select>
+						</div>
+						<div id="meshTransparency" title="check if background color on this mesh should be made transparent">
+							<label for="meshTransparencyCheck">transparency</label>:
+							<input type="checkbox" id="meshTransparencyCheck" style="display:initial" onchange="meshPanel.onChangeTransparency();">
+						</div>
+
+						<input type="checkbox" id="meshTransformCheck" onclick="meshPanel.onToggleTransform();" />
+						<label title="offset, rotation and scale settings" for="meshTransformCheck">
+							<span>transform</span>
+							<i id="meshTransformCheckIcon" class="material-icons">expand_less</i>
+						</label>
+
+						<div id="meshTransform" style="display:none;">
+							<div id="meshOffset">
+								<i class="material-icons" title="offset" style="vertical-align:middle">swap_horiz</i>
+								<input type="text" id="meshOffsetX" title="offset on x axis" size="5" value="0">
+								<input type="text" id="meshOffsetY" title="offset on y axis" size="5" value="0">
+								<input type="text" id="meshOffsetZ" title="offset on z axis" size="5" value="0">
+							</div>
+							<div id="meshRotation">
+								<i class="material-icons" title="rotation" style="vertical-align:middle">rotate_right</i>
+								<input type="text" id="meshRotationX" title="rotation in degrees around x axis" size="5" value="0">
+								<input type="text" id="meshRotationY" title="rotation in degrees around y axis" size="5" value="0">
+								<input type="text" id="meshRotationZ" title="rotation in degrees around z axis" size="5" value="0">
+							</div>
+							<div id="meshScale">
+								<i class="material-icons" title="scale" style="vertical-align:middle">zoom_out_map</i>
+								<input type="text" id="meshScaleX" title="scale on x axis" size="5" value="1">
+								<input type="text" id="meshScaleY" title="scale on y axis" size="5" value="1">
+								<input type="text" id="meshScaleZ" title="scale on z axis" size="5" value="1">
+							</div>
+						</div>
+					</div>
+
+					<div id="meshChildrenOuter" class="controlBox">
+						<input type="checkbox" id="meshChildrenCheck" onchange="meshPanel.onToggleChildren();">
+						<label title="combine this object with others" for="meshChildrenCheck">
+							<span>children</span>
+							<i id="meshChildrenCheckIcon" class="material-icons">expand_less</i>
+						</label>
+						<br>
+						<div id="meshChildren" style="display:none;">
+							<div class="buttonGroup">
+								<button title="add another mesh as a 'child' object which will be positioned relative to this one, its 'parent'" class="color0" onclick="meshConfigNewChildMesh();">
+									<i class="material-icons">add</i>
+								</button>
+							</div>
+						</div>
 					</div>
 				</div>
 
