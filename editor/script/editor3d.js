@@ -1,31 +1,5 @@
 var bitsy = window;
 
-var b3d = {
-    engine: null,
-    scene: null,
-    size: {
-        auto: true,
-        width: 512,
-        height: 512,
-    },
-    clearColor: 0,
-    fogColor: 0,
-
-    meshTemplates: {},
-
-    baseMat: null,
-
-    roomsInStack: {},
-    stackPosOfRoom: {},
-    curStack: null,
-
-    sprites: {},
-    items: {},
-    tiles: {},
-
-    caches: {},
-};
-
 var editor3d = {
     CursorModes: {
         Add: 0,
@@ -43,7 +17,7 @@ var editor3d = {
     curSelectedMesh: null,
 
     groundMesh: null,
-}
+};
 
 editor3d.cursor = {
     mesh: null,
@@ -61,17 +35,14 @@ editor3d.cursor = {
     modeBeforeModified: null,
 };
 
-function initRoom3d() {
-    var canvas3d = document.getElementById('room3dCanvas');
-    console.log('canvas3d');
-    console.log(canvas3d);
-    canvas3d.width = 512;
-    canvas3d.height = 512;
+editor3d.init = function() {
+    var canvas = document.getElementById('room3dCanvas');
+    console.log('canvas');
+    console.log(canvas);
+    canvas.width = 512;
+    canvas.height = 512;
 
-    b3d.engine = new BABYLON.Engine(canvas3d, false);
-    b3d.scene = new BABYLON.Scene(b3d.engine);
-    b3d.scene.ambientColor = new BABYLON.Color3(1, 1, 1);
-    b3d.scene.freezeActiveMeshes();
+    b3d.init(canvas);
 
     // make a mesh for 3d cursor
     editor3d.cursor.mesh = BABYLON.MeshBuilder.CreateBox('cursor', { size: 1.1 }, b3d.scene);
@@ -86,22 +57,13 @@ function initRoom3d() {
         width: bitsy.mapsize,
         height: bitsy.mapsize,
     }, b3d.scene);
-    transformGeometry(editor3d.groundMesh, BABYLON.Matrix.Translation(bitsy.mapsize/2 - 0.5, bitsy.mapsize/2 - 0.5, 0.5));
-    transformGeometry(editor3d.groundMesh, BABYLON.Matrix.RotationX(Math.PI/2));
+    b3d.transformGeometry(editor3d.groundMesh, BABYLON.Matrix.Translation(bitsy.mapsize/2 - 0.5, bitsy.mapsize/2 - 0.5, 0.5));
+    b3d.transformGeometry(editor3d.groundMesh, BABYLON.Matrix.RotationX(Math.PI/2));
     var groundMat = new BABYLON.StandardMaterial('ground material', b3d.scene);
     groundMat.maxSimultaneousLights = 0;
     groundMat.freeze();
     groundMat.alpha = 0;
     editor3d.groundMesh.material = groundMat;
-
-    // create basic resources
-    b3d.meshTemplates = initMeshTemplates();
-
-    // material
-    b3d.baseMat = new BABYLON.StandardMaterial('base material', b3d.scene);
-    b3d.baseMat.ambientColor = new BABYLON.Color3(1, 1, 1);
-    b3d.baseMat.maxSimultaneousLights = 0;
-    b3d.baseMat.freeze();
 
     // set up camera
     // todo: make a proper camera
@@ -119,29 +81,29 @@ function initRoom3d() {
     camera.upperHeightOffsetLimit = bitsy.mapsize / 2;
     camera.upperBetaLimit = Math.PI / 2;
 
-    camera.attachControl(canvas3d);
+    camera.attachControl(canvas);
 
-    // Watch for browser/canvas resize events
-    b3d.engine.setSize(b3d.size.width, b3d.size.height);
-    if (b3d.size.auto) {
-        b3d.engine.resize();
-        window.addEventListener("resize", function () {
-            b3d.engine.resize();
-        });
-    }
-
-    initRoomStacks();
+    // update texturing function to handle drawing replacement according to game-preview setting
+    var getTextureOrig = b3d.getTexture;
+    b3d.getTexture = function (drawing, pal) {
+        if (room3dPanel.gamePreviewMode) {
+            // handle drawing replacement tag
+            var altDrawing = editor3d.parseDrawTag(drawing);
+            drawing = altDrawing && altDrawing || drawing;
+        }
+        return getTextureOrig.call(b3d, drawing, pal);
+    };
 
     // set the rendering loop function
-    b3d.engine.runRenderLoop(render3d);
+    b3d.engine.runRenderLoop(editor3d.update);
 
     // add event listeners
-    canvas3d.addEventListener('mouseover', function (e) {
+    canvas.addEventListener('mouseover', function (e) {
         // register 3d cursor update & mouse picking
         editor3d.cursor.shouldUpdate = true;
     });
 
-    canvas3d.addEventListener('mouseleave', function (e) {
+    canvas.addEventListener('mouseleave', function (e) {
         // unregister 3d cursor update & mouse picking
         editor3d.cursor.shouldUpdate = false;
     });
@@ -205,11 +167,13 @@ function initRoom3d() {
         }
     };
 
-    b3d.scene.onPointerUp = room3dOnClick;
+    b3d.scene.onPointerUp = editor3d.onPointerUp;
 
     // update textures when pallete is changed
     bitsy.events.Listen('palette_change', function(event) {
-        if (bitsy.paletteTool) updateColor(bitsy.paletteTool.GetSelectedId());
+        if (bitsy.paletteTool){
+            b3d.updateColor(bitsy.paletteTool.GetSelectedId());
+        }
         // console.log('palette change event hiya hey');
     });
 
@@ -217,7 +181,7 @@ function initRoom3d() {
     // this relies on event listeners being called in order
     // it should work in any browser that implements dom3 events
     document.getElementById('paint').addEventListener('mouseup', function(e) {
-        updateTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
+        b3d.updateTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
         console.log('PAINT EVENT');
     });
 
@@ -226,9 +190,9 @@ function initRoom3d() {
         // reset stack objects
         b3d.roomsInStack = {};
         b3d.stackPosOfRoom = {};
-        initRoomStacks();
+        b3d.initRoomStacks();
         // clear all caches to force all drawings to reset during the update
-        removeFromCaches(Object.values(b3d.caches));
+        b3d.removeFromCaches(Object.values(b3d.caches));
         // this fixes 3d editor crash when removing rooms right after modifying game data
         bitsy.selectRoom(bitsy.curRoom);
     });
@@ -240,10 +204,10 @@ function initRoom3d() {
         deleteRoomOrig.call();
         // check if the room was actually deleted after the dialog
         if (bitsy.curRoom !== deletedRoom) {
-            unregisterRoomFromStack(deletedRoom);
+            b3d.unregisterRoomFromStack(deletedRoom);
         }
     }
-} // initRoom3d()
+}; // editor3d.init()
 
 // initialize 3d editor
 document.addEventListener('DOMContentLoaded', function() {
@@ -251,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var s = bitsy.start;
     bitsy.start = function() {
         s.call();
-        initRoom3d();
+        editor3d.init();
         // set up mesh panel ui after 3d editor data has been initialized
         meshPanel.init();
     };
@@ -268,47 +232,15 @@ document.addEventListener('DOMContentLoaded', function() {
     );
 });
 
-// stack helper functions
-function initRoomStacks() {
-    // register room stacks here
-    Object.values(bitsy.room).forEach(function (room) {
-        var name = room.name || '';
-        var tag = name.match(/#stack\(([a-zA-Z]+),(-?\.?\d*\.?\d*)\)/);
-        if (tag) {
-            registerRoomInStack(room.id, tag[1], Number(tag[2]) || 0);
-        }
-    });
-}
-
-function addRoomToStack(roomId, stackId, pos) {
+editor3d.addRoomToStack = function (roomId, stackId, pos) {
     var room = bitsy.room[roomId];
     var tag = `#stack(${stackId},${pos})`;
     room.name = room.name && ' ' + tag || tag;
     bitsy.updateNamesFromCurData();
-    registerRoomInStack(roomId, stackId, pos);
-}
+    b3d.registerRoomInStack(roomId, stackId, pos);
+};
 
-function registerRoomInStack(roomId, stackId, pos) {
-    b3d.roomsInStack[stackId] = b3d.roomsInStack[stackId] || [];
-    b3d.roomsInStack[stackId].push(roomId);
-    b3d.stackPosOfRoom[roomId] = {
-        stack: stackId,
-        pos: pos,
-    };
-}
-
-function unregisterRoomFromStack(roomId) {
-    if (!b3d.stackPosOfRoom[roomId]) return;
-    var stackId = b3d.stackPosOfRoom[roomId].stack;
-    b3d.roomsInStack[stackId].splice(b3d.roomsInStack[stackId].indexOf(roomId), 1);
-    delete b3d.stackPosOfRoom[roomId];
-    // delete the stack if it became empty
-    if (b3d.roomsInStack[stackId].length === 0) {
-        delete b3d.roomsInStack[stackId];
-    }
-}
-
-function newStackId() {
+editor3d.newStackId = function () {
     // generate valid stack id
     // for now only use letters
     // this will ensure compatibility with current version of 3d hack
@@ -343,106 +275,9 @@ function newStackId() {
         increment(id, 97, 122);
     }
     return makeLetters(id);
-}
+};
 
-function initMeshTemplates() {
-    var meshTemplates = {};
-    // box and towers
-    for (var i = 1; i <= bitsy.mapsize; ++i) {
-        var boxMesh = BABYLON.MeshBuilder.CreateBox('tower' + i, {
-            size: 1,
-            height: i,
-            faceUV: [
-                new BABYLON.Vector4(0, 0, 1, i), // "back"
-                new BABYLON.Vector4(0, 0, 1, i), // "front"
-                new BABYLON.Vector4(0, 0, 1, i), // "right"
-                new BABYLON.Vector4(0, 0, 1, i), // "left"
-                new BABYLON.Vector4(0, 0, 1, 1), // "top"
-                new BABYLON.Vector4(0, 0, 1, 1), // "bottom"
-            ],
-            wrap: true,
-        }, b3d.scene);
-        var uvs = boxMesh.getVerticesData(BABYLON.VertexBuffer.UVKind);
-        boxMesh.setVerticesData(BABYLON.VertexBuffer.UVKind, uvs);
-        boxMesh.isVisible = false;
-        boxMesh.doNotSyncBoundingInfo = true;
-        // adjust template position so that the instances will be displated correctly
-        transformGeometry(boxMesh, BABYLON.Matrix.Translation(0.0, i / 2 - 0.5, 0.0));
-        meshTemplates['tower' + i] = boxMesh;
-    }
-    meshTemplates.box = meshTemplates.tower1;
-
-    // floor
-    var floorMesh = BABYLON.MeshBuilder.CreatePlane(`floor`, {
-        width: 1,
-        height: 1,
-    }, b3d.scene);
-    // adjust template position so that the instances will be displated correctly
-    transformGeometry(floorMesh, BABYLON.Matrix.Translation(0.0, 0.0, 0.5));
-    // have to transform geometry instead of using regular rotation
-    // or it will mess up children transforms when using combine tag
-    transformGeometry(floorMesh, BABYLON.Matrix.RotationX(Math.PI/2));
-    floorMesh.isVisible = false;
-    floorMesh.doNotSyncBoundingInfo = true;
-    meshTemplates.floor = floorMesh;
-
-    // plane
-    var planeMesh = BABYLON.MeshBuilder.CreatePlane('plane', {
-        width: 1,
-        height: 1,
-        sideOrientation: BABYLON.Mesh.DOUBLESIDE,
-        frontUVs: new BABYLON.Vector4(0, 1, 1, 0),
-        backUVs: new BABYLON.Vector4(0, 1, 1, 0),
-    }, b3d.scene);
-    // in case of rotation have to transform geometry or it will affect positions of its children
-    transformGeometry(planeMesh, BABYLON.Matrix.RotationX(Math.PI));
-    planeMesh.isVisible = false;
-    meshTemplates.plane = planeMesh;
-    planeMesh.doNotSyncBoundingInfo = true;
-    meshTemplates.billboard = planeMesh.clone('billboard');
-
-    // wedge
-    var wedgeMesh = new BABYLON.Mesh("wedgeMesh", b3d.scene);
-    var wedgeMeshPos = [
-        -1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 1, 0, 1, 1, // 0,1,2, 3,4,5,
-        -1, 0, 1, -1, 0, 0, 0, 1, 0, 0, 1, 1, // 6,7,8,9
-        0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, // 10,11,12,13
-        0, 0, 1, 0, 0, 0, -1, 0, 0, -1, 0, 1 // 14,15,16,17
-    ];
-    var wedgeMeshInd = [
-        0, 1, 2, 3, 4, 5, //triangles on the front and the back
-        6, 7, 8, 8, 9, 6, // tris that make up the sliding face at the top
-        10, 11, 12, 12, 13, 10, // right face
-        14, 15, 16, 16, 17, 14 // bottom face
-    ];
-    var wedgeMeshUvs = [
-        0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1,
-        0, 0, 1, 0, 1, 1, 0, 1,
-        0, 0, 1, 0, 1, 1, 0, 1,
-        0, 0, 1, 0, 1, 1, 0, 1
-    ];
-    var wedgeMeshVertData = new BABYLON.VertexData();
-    wedgeMeshVertData.positions = wedgeMeshPos;
-    wedgeMeshVertData.indices = wedgeMeshInd;
-    wedgeMeshVertData.uvs = wedgeMeshUvs;
-
-    var translation = BABYLON.Matrix.Translation(0.5, -0.5, -0.5);
-    wedgeMeshVertData.transform(translation);
-
-    wedgeMeshVertData.applyToMesh(wedgeMesh);
-    wedgeMesh.isVisible = false; // but newly created copies and instances will be visible by default
-    wedgeMesh.doNotSyncBoundingInfo = true;
-
-    meshTemplates.wedge = wedgeMesh;
-
-    // empty mesh for making drawings invisible
-    var emptyMesh = new BABYLON.Mesh("emptyMesh", b3d.scene);
-    meshTemplates.empty = emptyMesh;
-    return meshTemplates;
-}
-
-
-function room3dOnClick (e) {
+editor3d.onPointerUp = function (e) {
     editor3d.cursor.isMouseDown = false;
     // continue updating cursor after moving the camera
     editor3d.cursor.shouldUpdate = true;
@@ -464,14 +299,14 @@ function room3dOnClick (e) {
             // if current room is a stray room without a stack, new stack should be created
             // and the current room should be added to it
             if (!b3d.curStack) {
-                b3d.curStack = newStackId();
-                addRoomToStack(bitsy.curRoom, b3d.curStack, 0);
+                b3d.curStack = editor3d.newStackId();
+                editor3d.addRoomToStack(bitsy.curRoom, b3d.curStack, 0);
             }
 
             // note: this function sets bitsy.curRoom to newly created room
             bitsy.newRoom();
             var newRoomId = bitsy.curRoom;
-            addRoomToStack(newRoomId, b3d.curStack, editor3d.cursor.mesh.position.y);
+            editor3d.addRoomToStack(newRoomId, b3d.curStack, editor3d.cursor.mesh.position.y);
             editor3d.cursor.curRoomId = newRoomId;
         }
 
@@ -489,7 +324,7 @@ function room3dOnClick (e) {
             if (mesh) {
                 mesh.position = editor3d.cursor.mesh.position;
                 // make sure to reapply additional transformation from tags
-                applyTransformTags(s, mesh);
+                b3d.applyTransformTags(s, mesh);
                 // update bitsyOrigin object to make sure mouse picking will work correctly
                 mesh.bitsyOrigin.x = s.x;
                 mesh.bitsyOrigin.y = s.y;
@@ -571,9 +406,9 @@ function room3dOnClick (e) {
     }
     bitsy.roomTool.drawEditMap();
     bitsy.updateRoomName();
-} // room3dOnClick
+}; // editor3d.onPointerUp()
 
-function updateCursor(pickInfo) {
+editor3d.updateCursor = function (pickInfo) {
     // assume that cursor isn't in the valid position unless it is proved to be different
     editor3d.cursor.isValid = false;
     editor3d.cursor.mesh.isVisible = false;
@@ -593,7 +428,7 @@ function updateCursor(pickInfo) {
         editor3d.cursor.mesh.material.ambientColor = editor3d.CursorColors.Green;
         // figure out the normal manually, because babylon's built in method doesn't work for wedges
         // and possibly other custom meshes
-        var normal = getNormal(mesh, faceId);
+        var normal = editor3d.getNormal(mesh, faceId);
         // console.log('face normal: ' + normal.asArray().map(i => ' ' + i.toFixed(1)));
         // console.log('picked point: ' + point.asArray().map(i => ' ' + i.toFixed(1)));
 
@@ -632,7 +467,7 @@ function updateCursor(pickInfo) {
         // check if the space in this room is already occupied
         // check if there is an empty space for a tile and for item/sprite
         // return depending on what type of the drawing is currently selected as a brush
-        if (editor3d.cursor.curRoomId && !canPlaceDrawing(room[editor3d.cursor.curRoomId], editor3d.cursor.roomX, editor3d.cursor.roomY)) {
+        if (editor3d.cursor.curRoomId && !editor3d.canPlaceDrawing(room[editor3d.cursor.curRoomId], editor3d.cursor.roomX, editor3d.cursor.roomY)) {
             // console.log("can't place the cursor: the cell isn't empty");
             return;
         }
@@ -656,9 +491,9 @@ function updateCursor(pickInfo) {
         editor3d.cursor.isValid = true;
         editor3d.cursor.mesh.isVisible = true;
     }
-}
+}; // editor3d.updateCursor()
 
-function canPlaceDrawing(room, x, y) {
+editor3d.canPlaceDrawing = function (room, x, y) {
     // use 3d hack's 'b3d.sprites' object that already keeps track of
     // all b3d.sprites that are currently in the b3d.scene
     if (bitsy.drawing.type === TileType.Tile) {
@@ -670,9 +505,9 @@ function canPlaceDrawing(room, x, y) {
                 return s.room === room.id && s.x === x && s.y === y;
             });
     }
-}
+};
 
-function getNormal(mesh, faceId) {
+editor3d.getNormal = function (mesh, faceId) {
     var indices = mesh.getIndices();
     var i0 = indices[faceId * 3];
     var i1 = indices[faceId * 3 + 1];
@@ -719,14 +554,14 @@ function getNormal(mesh, faceId) {
     // console.log('transformed by world matrix: ' + normal);
 
     return normal;
-}
+}; // editor3d.getNormal()
 
-function render3d() {
-    room3dUpdate();
+editor3d.update = function () {
+    b3d.update();
 
     // update cursor
     if (editor3d.cursor.shouldUpdate) {
-        updateCursor(b3d.scene.pick(
+        editor3d.updateCursor(b3d.scene.pick(
             b3d.scene.pointerX, b3d.scene.pointerY,
             function(m) {
                 if (editor3d.cursor.mode !== editor3d.CursorModes.Add) {
@@ -738,382 +573,9 @@ function render3d() {
     }
 
     b3d.scene.render();
-}
+};
 
-// to adjust vertices on the mesh
-function transformGeometry(mesh, matrix) {
-    var vertData = BABYLON.VertexData.ExtractFromMesh(mesh);
-    vertData.transform(matrix);
-    vertData.applyToMesh(mesh);
-}
-
-// cache helper
-function getCache(cacheName, make) {
-    var cache = {};
-    b3d.caches[cacheName] = cache;
-    return function (id, args) {
-        var cached = cache[id];
-        if (cached) {
-            return cached;
-        }
-        cached = cache[id] = make.apply(undefined, args);
-        return cached;
-    };
-}
-
-var getTextureFromCache = getCache('tex', function(drawing, pal) {
-    var canvas = bitsy.renderer.GetImage(drawing, pal);
-    var ctx = canvas.getContext('2d');
-
-    var tex = new BABYLON.DynamicTexture('test', {
-        width: canvas.width,
-        height: canvas.height,
-    }, b3d.scene, false, BABYLON.Texture.NEAREST_NEAREST_MIPNEAREST);
-
-    tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
-
-    if (b3d.isTransparent(drawing)) {
-        tex.hasAlpha = true;
-        // from transparent b3d.sprites hack
-        // redraw image context with all bg pixels transparent
-        var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var bg = bitsy.getPal(pal)[0];
-        for (let i = 0; i < data.data.length; i += 4) {
-            var r = data.data[i];
-            var g = data.data[i + 1];
-            var b = data.data[i + 2];
-            if (r === bg[0] && g === bg[1] && b === bg[2]) {
-                data.data[i + 3] = 0;
-            }
-        }
-        ctx.putImageData(data, 0, 0);
-    }
-    var texCtx = tex.getContext();
-    texCtx.drawImage(canvas, 0, 0);
-    tex.update();
-    return tex;
-});
-
-function getTexture(drawing, pal) {
-    if (room3dPanel.gamePreviewMode) {
-        // handle drawing replacement tag
-        var altDrawing = parseDrawTag(drawing);
-        drawing = altDrawing && altDrawing || drawing;
-    }
-
-    var drw = drawing.drw;
-    var col = drawing.col;
-    var frame = drawing.animation.frameIndex;
-    var key = `${drw},${frame},${col},${pal}`;
-    return getTextureFromCache(key, [drawing, pal]);
-}
-
-var getMaterialFromCache = getCache('mat', function (drawing, pal) {
-    var mat = b3d.baseMat.clone();
-    mat.diffuseTexture = getTexture(drawing, pal);
-    mat.freeze();
-    return mat;
-});
-
-function getMaterial(drawing, pal) {
-    var drw = drawing.drw;
-    var col = drawing.col;
-    var frame = drawing.animation.frameIndex;
-    var key = `${drw},${frame},${col},${pal}`;
-    return getMaterialFromCache(key, [drawing, pal]);
-}
-
-var getMeshFromCache = getCache('mesh', function (drawing, pal, type) {
-    var mesh = b3d.meshTemplates[type].clone();
-    mesh.makeGeometryUnique();
-    mesh.isVisible = false;
-    mesh.material = getMaterial(drawing, pal);
-    // enable vertical tiling for towers
-    if (type.startsWith('tower')) {
-        mesh.material.diffuseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
-    }
-    return mesh;
-});
-
-function getMesh(drawing, pal) {
-    var type = b3d.getMeshType(drawing);
-    var drw = drawing.drw;
-    var col = drawing.col;
-    var frame = drawing.animation.frameIndex;
-    // include type in the key to account for cases when drawings that link to
-    // the same 'drw' need to have different types when using with other hacks
-    var key = `${drw},${frame},${col},${pal},${type}`;
-    return getMeshFromCache(key, [drawing, pal, type]);
-}
-
-function removeFromCaches(cachesArr, drw, frame, col, pal) {
-    var r = new RegExp(`${drw || '\\D\\D\\D_\\w+?'},${frame || '\\d*?'},${col || '\\d*?'},${pal || '\\d*'}`);
-    cachesArr.forEach(function(cache) {
-        Object.keys(cache)
-            .filter(function(key) {return r.test(key);})
-            .forEach(function(key) {
-                cache[key].dispose();
-                delete cache[key];
-            });
-    });
-}
-
-function updateColor(pal) {
-    removeFromCaches(Object.values(b3d.caches), null, null, null, pal);
-}
-
-function updateTexture(drw, frame) {
-    removeFromCaches(Object.values(b3d.caches), drw, frame, null, null);
-}
-
-function room3dUpdate() {
-    // console.log("update called");
-    b3d.curStack = b3d.stackPosOfRoom[bitsy.curRoom] && b3d.stackPosOfRoom[bitsy.curRoom].stack || null;
-
-    // sprite changes
-    Object.entries(b3d.sprites).forEach(function (entry) {
-        var id = entry[0];
-        var mesh = entry[1];
-        var s = bitsy.sprite[id];
-        if (s && isRoomVisible(s.room)) {
-        // if the sprite still exits, is in the current room or in the current stack
-        // update sprite's position
-            mesh.position.x = s.x;
-            mesh.position.z = bitsy.mapsize - 1 - s.y;
-            mesh.position.y = b3d.curStack && b3d.stackPosOfRoom[s.room].pos || 0;
-            mesh.bitsyOrigin.x = s.x;
-            mesh.bitsyOrigin.y = s.y;
-            mesh.bitsyOrigin.roomId = s.room;
-            applyTransformTags(s, mesh);
-        } else {
-        // otherwise remove the sprite
-            mesh.dispose();
-            mesh = null;
-            delete b3d.sprites[id];
-        }
-    });
-    Object.values(bitsy.sprite).filter(function (s) {
-        // go through bitsy b3d.sprites and get those that should be currently displayed
-        return isRoomVisible(s.room);
-    }).forEach(function (s) {
-        var id = s.id;
-        var oldMesh = b3d.sprites[id];
-        var newMesh = getMesh(s, bitsy.curPal());
-        if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
-            if (oldMesh) {
-                oldMesh.dispose();
-            }
-            newMesh = addMeshInstance(newMesh, s, s.room, s.x, s.y);
-            b3d.sprites[id] = oldMesh = newMesh;
-        }
-    });
-
-    // item changes
-    // delete irrelevant b3d.items
-    Object.entries(b3d.items).forEach(function (entry) {
-        var roomId = entry[0].slice(0, entry[0].indexOf(','));
-        if (isRoomVisible(roomId)) {
-            // if this item is in the current stack
-            // check if it is still listed in its room
-            // if so keep it as it is and return
-            if (bitsy.room[roomId].items.find(function (item) {
-                    return `${roomId},${item.id},${item.x},${item.y}` === entry[0];
-                })) {
-                return;
-            }
-        }
-        // if this item is not in the current stack
-        // or in the current stack but was picked up or stolen by demons
-        entry[1].dispose();
-        entry[1] = null;
-        delete b3d.items[entry[0]];
-    });
-
-    // make/update relevant b3d.items
-    (b3d.roomsInStack[b3d.curStack] || [bitsy.curRoom]).forEach(function (roomId) {
-        bitsy.room[roomId].items.forEach(function (roomItem) {
-            var key = `${roomId},${roomItem.id},${roomItem.x},${roomItem.y}`;
-            var item = bitsy.item[roomItem.id];
-            var oldMesh = b3d.items[key];
-            var newMesh = getMesh(item, bitsy.curPal());
-            if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
-                if (oldMesh) {
-                    oldMesh.dispose();
-                }
-                newMesh = addMeshInstance(newMesh, item, roomId, roomItem.x, roomItem.y);
-                b3d.items[key] = newMesh;
-            }
-        });
-    });
-
-    // updated b3d.tiles logic
-    // first clear the b3d.tiles from rooms that should not be currently displayed
-    Object.keys(b3d.tiles)
-        .filter(function(roomId) { return !isRoomVisible(roomId) })
-        .forEach(function(roomId) {
-            b3d.tiles[roomId].forEach(function (row) {
-                row.forEach(function (tileMesh) {
-                    if (tileMesh !== null) {
-                        tileMesh.dispose();
-                    }
-                });
-            });
-            delete b3d.tiles[roomId];
-        });
-
-    // iterate throught tilemaps of rooms in the current stack
-    // and update 3d b3d.scene objects accordingly
-    (b3d.roomsInStack[b3d.curStack] || [bitsy.curRoom]).forEach(function (roomId) {
-        if (!b3d.tiles[roomId]) {
-            // generate empty 2d array for meshes
-            b3d.tiles[roomId] = bitsy.room[roomId].tilemap.map(function(row) {
-                return row.map(function(tileId) {
-                    return null;
-                });
-            });
-        }
-        bitsy.room[roomId].tilemap.forEach(function(row, y) {
-            row.forEach(function(tileId, x) {
-                var oldMesh = b3d.tiles[roomId][y][x];
-                var newMesh = null;
-                if (tileId !== '0') {
-                    newMesh = getMesh(bitsy.tile[tileId], bitsy.curPal());
-                }
-                if (oldMesh !== newMesh && (newMesh !== (oldMesh && oldMesh.sourceMesh)))  {
-                    if (oldMesh) {
-                        oldMesh.dispose();
-                    }
-                    if (newMesh) {
-                        newMesh = addMeshInstance(newMesh, bitsy.tile[tileId], roomId, x, y);
-                    }
-                    b3d.tiles[roomId][y][x] = newMesh;
-                }
-            });
-        });
-    });
-
-    // bg changes
-    b3d.scene.clearColor = getColor(b3d.clearColor);
-    b3d.scene.fogColor = getColor(b3d.fogColor);
-}
-
-function isRoomVisible(roomId) {
-    // true if the room is the current room or we are in the stack and the room is not a stray room and is in the current stack
-    return roomId === bitsy.curRoom || b3d.curStack && b3d.stackPosOfRoom[roomId] && b3d.stackPosOfRoom[roomId].stack === b3d.curStack;
-}
-
-function addMeshInstance(mesh, drawing, roomId, x, y) {
-    instance = mesh.createInstance();
-    instance.position.x = x;
-    instance.position.z = bitsy.mapsize - 1 - y;
-    instance.position.y = b3d.stackPosOfRoom[roomId] && b3d.stackPosOfRoom[roomId].pos || 0;
-
-    // // 3d editor addition:
-    // // bitsyOrigin property to correctly determine corresponding bitsy drawing when mouse-picking
-    instance.bitsyOrigin = {
-        drawing: drawing,
-        x: x,
-        y: y,
-        roomId: roomId,
-    };
-
-    b3d.meshExtraSetup(drawing, instance);
-
-    return instance;
-}
-
-function getColor(colorId) {
-    var col = bitsy.palette[bitsy.curPal()].colors[colorId];
-    return new BABYLON.Color3(
-        col[0] / 255,
-        col[1] / 255,
-        col[2] / 255
-    );
-}
-
-function applyTransformTags(drawing, mesh) {
-    var name = drawing.name || '';
-    // transform tags. #t(x,y,z): translate (move), #r(x,y,z): rotate, #s(x,y,z): scale
-    // #m(1,0,0.5) and #m(1,,.5) are both examples of valid input
-    // scale
-    var scaleTag = name.match(/#s\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-    if (scaleTag) {
-        mesh.scaling = new BABYLON.Vector3(
-            Number(scaleTag[1]) || 0,
-            Number(scaleTag[2]) || 0,
-            Number(scaleTag[3]) || 0
-        );
-    }
-    // rotate. input in degrees
-    var rotateTag = name.match(/#r\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-    if (rotateTag) {
-        mesh.rotation.x += radians(Number(rotateTag[1]) || 0);
-        mesh.rotation.y += radians(Number(rotateTag[2]) || 0);
-        mesh.rotation.z += radians(Number(rotateTag[3]) || 0);
-    }
-    // translate (move)
-    var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-    if (translateTag) {
-        mesh.position.x += (Number(translateTag[1]) || 0);
-        mesh.position.y += (Number(translateTag[2]) || 0);
-        mesh.position.z += (Number(translateTag[3]) || 0);
-    }
-
-    function radians(degrees) {
-        return degrees * Math.PI / 180;
-    }
-}
-
-function applyChildrenTag(drawing, mesh) {
-    var name = drawing.name || '';
-    // children tag
-    // for now for animation to work gotta make sure that the parent drawing has as many frames as children
-    var childrenTag;
-    // make sure the mesh we are about to add children to doesn't have a parent on its own to avoid ifinite loops
-    // maybe add checking for parents of parents recursively up to a certain number to allow more complex combinations
-    if (!mesh.parent) {
-        childrenTag = name.match(/#children\(([\w-, ]+)\)/);
-    }
-    if (childrenTag) {
-        // parse args and get the actual drawings
-        var children = childrenTag[1].split(/, |,/).map(function(arg) {
-            if (arg) {
-                var type, id, map;
-                [type, id] = arg.split(/[ _-]/);
-                if (type && id) {
-                    switch (type[0].toLowerCase()) {
-                        case 't':
-                            map = bitsy.tile;
-                            break;
-                        case 'i':
-                            map = bitsy.item;
-                            break;
-                        case 's':
-                            map = bitsy.sprite;
-                    }
-                    if (map) {
-                        return map[id];
-                    }
-                }
-            }
-        }).filter(Boolean);
-
-        // add specified drawings to the b3d.scene as child meshes
-        children.forEach(function(childDrawing) {
-            var childMesh = getMesh(childDrawing, bitsy.curPal());
-            childMesh = childMesh.createInstance();
-            childMesh.position.x = mesh.position.x;
-            childMesh.position.y = mesh.position.y;
-            childMesh.position.z = mesh.position.z;
-            mesh.addChild(childMesh);
-            b3d.meshExtraSetup(childDrawing, childMesh);
-            // for editor version of the 3d hack allow all child meshes to move with their parent
-            childMesh.unfreezeWorldMatrix();
-        });
-    }
-}
-
-function parseDrawTag(drawing) {
+editor3d.parseDrawTag = function (drawing) {
     // replace drawings marked with the #draw(TYPE,id) tag
     var name = drawing.name || '';
     var tag = name.match(/#draw\((TIL|SPR|ITM),([a-zA-Z0-9]+)\)/);
@@ -1141,69 +603,6 @@ function parseDrawTag(drawing) {
         } else {
             console.error(`couldn't replace ${drawing.name}! there is no '${tag[1]} ${id}'`);
         }
-    }
-}
-
-b3d.isTransparent = function (drawing) {
-    var name = drawing.name || '';
-    var match = name.match(/#transparent\(((true)|(false))\)/);
-    if (match) {
-        // 2nd capturing group reserved for 'true' will be undefined if the input said 'false'
-        return Boolean(match[2]);
-    }
-    return b3d.getDefaultTransparency(drawing);
-};
-
-b3d.getDefaultTransparency = function (drawing) {
-    return !drawing.drw.includes('TIL');
-};
-
-b3d.getMeshType = function (drawing) {
-    var name = drawing.name || '';
-    var meshMatch = name.match(/#mesh\((.+?)\)/);
-    if (meshMatch) {
-        if (b3d.meshTemplates[meshMatch[1]]) {
-            // editor addition: ignore empty mesh tag if not in the game preview mode
-            if (room3dPanel.gamePreviewMode || meshMatch[1] !== 'empty') {
-                return meshMatch[1];
-            }
-        } else {
-            // if the specified mesh template doesn't exist,
-            // display error message, but continue execution
-            // to resolve the mesh with default logic
-            console.error(`mesh template '${meshMatch[1]}' wasn't found`);
-        }
-    }
-    return b3d.getDefaultMeshType(drawing);
-}
-
-b3d.getDefaultMeshType = function (drawing) {
-    if (drawing.id === bitsy.playerId) {
-        return 'plane';
-    }
-    if (drawing.drw.startsWith('ITM')) {
-        return 'plane';
-    }
-    if (drawing.drw.startsWith('SPR')) {
-        return 'billboard';
-    }
-    if (drawing.isWall) {
-        return 'box';
-    }
-    return 'floor';
-}
-
-b3d.getBillboardMode = function () {
-    return BABYLON.TransformNode.BILLBOARDMODE_Y | BABYLON.TransformNode.BILLBOARDMODE_Z;
-};
-
-b3d.meshExtraSetup = function (drawing, mesh) {
-    applyChildrenTag(drawing, mesh);
-    applyTransformTags(drawing, mesh);
-    if (mesh.sourceMesh.source.name === 'billboard') {
-        mesh.billboardMode = b3d.getBillboardMode();
-    } else if (!drawing.drw.startsWith('SPR')) {
-        mesh.freezeWorldMatrix();
     }
 };
 
@@ -1240,7 +639,7 @@ var room3dPanel = {
 
     duplicate: function() {
         var roomList = b3d.curStack && b3d.roomsInStack[b3d.curStack] || [bitsy.curRoom];
-        b3d.curStack = b3d.curStack && newStackId() || null;
+        b3d.curStack = b3d.curStack && editor3d.newStackId() || null;
         roomList.forEach(function(roomId) {
             bitsy.selectRoom(roomId);
             try {
@@ -1249,7 +648,7 @@ var room3dPanel = {
                 // todo: fix that bug in bitsy code? idk
             }
             if (b3d.curStack) {
-                addRoomToStack(bitsy.curRoom, b3d.curStack, b3d.stackPosOfRoom[roomId].pos);
+                editor3d.addRoomToStack(bitsy.curRoom, b3d.curStack, b3d.stackPosOfRoom[roomId].pos);
             }
         });
     },
@@ -1276,7 +675,7 @@ var room3dPanel = {
                     }
                 }
                 delete room[roomId];
-                unregisterRoomFromStack(roomId);
+                b3d.unregisterRoomFromStack(roomId);
             });
             bitsy.refreshGameData();
 
@@ -1292,7 +691,7 @@ var room3dPanel = {
             bitsy.deleteRoom();
         }
     },
-} // room3dPanel
+}; // room3dPanel
 
 // set up and respond to ui elements in mesh panel
 var meshPanel = {
