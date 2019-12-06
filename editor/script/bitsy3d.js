@@ -14,8 +14,10 @@ var b3d = {
     meshTemplates: {},
     baseMat: null,
 
+    meshConfig: {},
     roomsInStack: {},
     stackPosOfRoom: {},
+    
     curStack: null,
 
     sprites: {},
@@ -23,6 +25,10 @@ var b3d = {
     tiles: {},
 
     caches: {},
+
+    // when set to true, drawing replacements won't be applied,
+    // and drawings set to have empty meshes will have their default visible meshes instead
+    debugView: false,
 };
 
 b3d.init = function (canvas) {
@@ -52,7 +58,7 @@ b3d.init = function (canvas) {
     b3d.parseData();
 };
 
-// parse config data serialized in stack and drawing names
+// parse data serialized in stack and drawing names
 b3d.parseData = function () {
     // register room stacks
     Object.values(bitsy.room).forEach(function (room) {
@@ -61,6 +67,16 @@ b3d.parseData = function () {
         if (tag) {
             b3d.registerRoomInStack(room.id, tag[1], Number(tag[2]) || 0);
         }
+    });
+    // parse mesh config
+    [].concat(Object.values(bitsy.item), Object.values(bitsy.tile), Object.values(bitsy.sprite)).forEach(function (drawing) {
+        b3d.meshConfig[drawing.drw] = {
+            type: b3d.getMeshType(drawing),
+            transform: b3d.parseTransformTags(drawing),
+            transparency: b3d.isTransparent(drawing),
+            replacement: b3d.parseDrawTag(drawing),
+            children: b3d.parseChildrenTag(drawing),
+        };
     });
 };
 
@@ -213,7 +229,7 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal) {
 
     tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
 
-    if (b3d.isTransparent(drawing)) {
+    if (b3d.meshConfig[drawing.drw].transparency) {
         tex.hasAlpha = true;
         // from transparent sprites hack
         // redraw image context with all bg pixels transparent
@@ -236,6 +252,11 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal) {
 });
 
 b3d.getTexture = function (drawing, pal) {
+    if (!b3d.debugView) {
+        // apply drawing replacement
+        var altDrawing = b3d.meshConfig[drawing.drw].replacement;
+        drawing = altDrawing && altDrawing || drawing;
+    }
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
@@ -271,7 +292,7 @@ b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, type) {
 });
 
 b3d.getMesh = function (drawing, pal) {
-    var type = b3d.getMeshType(drawing);
+    var type = b3d.meshConfig[drawing.drw].type;
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
@@ -465,7 +486,8 @@ b3d.getColor = function (colorId) {
     );
 };
 
-b3d.applyTransformTags = function (drawing, mesh) {
+// returns transform matrix or undefined
+b3d.parseTransformTags = function (drawing) {
     var name = drawing.name || '';
 
     // transform tags. #t(x,y,z): translate (move), #r(x,y,z): rotate, #s(x,y,z): scale
@@ -474,44 +496,71 @@ b3d.applyTransformTags = function (drawing, mesh) {
     var rotateTag = name.match(/#r\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/) || [];
     var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/) || [];
 
-    var matrix = BABYLON.Matrix.Compose(
-        new BABYLON.Vector3(
-            Number(scaleTag[1]) || 1,
-            Number(scaleTag[2]) || 1,
-            Number(scaleTag[3]) || 1
-        ),
-        BABYLON.Quaternion.FromEulerAngles(
-            radians(Number(rotateTag[1]) || 0),
-            radians(Number(rotateTag[2]) || 0),
-            radians(Number(rotateTag[3]) || 0)
-        ),
-        new BABYLON.Vector3(
-            (Number(translateTag[1]) || 0),
-            (Number(translateTag[2]) || 0),
-            (Number(translateTag[3]) || 0)
-        ),
-    );
+    var matrix;
+    if (scaleTag || rotateTag || translateTag) {
+        matrix = BABYLON.Matrix.Compose(
+            new BABYLON.Vector3(
+                Number(scaleTag[1]) || 1,
+                Number(scaleTag[2]) || 1,
+                Number(scaleTag[3]) || 1
+            ),
+            BABYLON.Quaternion.FromEulerAngles(
+                (Number(rotateTag[1]) || 0) * Math.PI / 180,
+                (Number(rotateTag[2]) || 0) * Math.PI / 180,
+                (Number(rotateTag[3]) || 0) * Math.PI / 180
+            ),
+            new BABYLON.Vector3(
+                Number(translateTag[1]) || 0,
+                Number(translateTag[2]) || 0,
+                Number(translateTag[3]) || 0
+            ),
+        );
+    }
 
-    mesh.setPreTransformMatrix(matrix);
+    return matrix;
+};
 
-    function radians(degrees) {
-        return degrees * Math.PI / 180;
+b3d.parseDrawTag = function (drawing) {
+    // replace drawings marked with the #draw(TYPE,id) tag
+    var name = drawing.name || '';
+    var tag = name.match(/#draw\((TIL|SPR|ITM),([a-zA-Z0-9]+)\)/);
+    if (tag) {
+        var map;
+        // tag[1] is the first capturing group, it can be either TIL, SPR, or ITM
+        switch (tag[1]) {
+            case 'TIL':
+                map = bitsy.tile;
+                break;
+            case 'SPR':
+                map = bitsy.sprite;
+                break;
+            case 'ITM':
+                map = bitsy.item;
+                break;
+            default:
+                break;
+        }
+        // tag[2] is the second capturing group which returns drawing id
+        var id = tag[2];
+        var newDrawing = map[id];
+        if (newDrawing) {
+            return newDrawing;
+        } else {
+            console.error(`couldn't replace ${drawing.name}! there is no '${tag[1]} ${id}'`);
+        }
     }
 };
 
-b3d.applyChildrenTag = function (drawing, mesh) {
+b3d.parseChildrenTag = function (drawing) {
+    var children;
     var name = drawing.name || '';
     // children tag
     // for now for animation to work gotta make sure that the parent drawing has as many frames as children
     var childrenTag;
-    // make sure the mesh we are about to add children to doesn't have a parent on its own to avoid ifinite loops
-    // maybe add checking for parents of parents recursively up to a certain number to allow more complex combinations
-    if (!mesh.parent) {
-        childrenTag = name.match(/#children\(([\w-, ]+)\)/);
-    }
+    childrenTag = name.match(/#children\(([\w-, ]+)\)/);
     if (childrenTag) {
         // parse args and get the actual drawings
-        var children = childrenTag[1].split(/, |,/).map(function(arg) {
+        children = childrenTag[1].split(/, |,/).map(function(arg) {
             if (arg) {
                 var type, id, map;
                 [type, id] = arg.split(/[ _-]/);
@@ -532,9 +581,15 @@ b3d.applyChildrenTag = function (drawing, mesh) {
                 }
             }
         }).filter(Boolean);
+    }
+    return children;
+}
 
+b3d.addChildren = function (drawing, mesh) {
+    // make sure the mesh we are about to add children to doesn't have a parent on its own to avoid ifinite loops
+    if (!mesh.parent && b3d.meshConfig[drawing.drw].children) {
         // add specified drawings to the b3d.scene as child meshes
-        children.forEach(function(childDrawing) {
+        b3d.meshConfig[drawing.drw].children.forEach(function(childDrawing) {
             var childMesh = b3d.getMesh(childDrawing, bitsy.curPal());
             childMesh = childMesh.createInstance();
             childMesh.position.x = mesh.position.x;
@@ -567,8 +622,8 @@ b3d.getMeshType = function (drawing) {
     var meshMatch = name.match(/#mesh\((.+?)\)/);
     if (meshMatch) {
         if (b3d.meshTemplates[meshMatch[1]]) {
-            // editor addition: ignore empty mesh tag if not in the game preview mode
-            if (room3dPanel.gamePreviewMode || meshMatch[1] !== 'empty') {
+            // ignore empty mesh tag if we are in debug view
+            if (!b3d.debugView || meshMatch[1] !== 'empty') {
                 return meshMatch[1];
             }
         } else {
@@ -602,8 +657,10 @@ b3d.getBillboardMode = function () {
 };
 
 b3d.meshExtraSetup = function (drawing, mesh) {
-    b3d.applyChildrenTag(drawing, mesh);
-    b3d.applyTransformTags(drawing, mesh);
+    b3d.addChildren(drawing, mesh);
+    if (b3d.meshConfig[drawing.drw].transform) {
+        mesh.setPreTransformMatrix(b3d.meshConfig[drawing.drw].transform);
+    }
     if (mesh.sourceMesh.source.name === 'billboard') {
         mesh.billboardMode = b3d.getBillboardMode();
     } else if (!drawing.drw.startsWith('SPR')) {

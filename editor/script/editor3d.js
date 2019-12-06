@@ -83,17 +83,6 @@ editor3d.init = function() {
 
     camera.attachControl(canvas);
 
-    // update texturing function to handle drawing replacement according to game-preview setting
-    var getTextureOrig = b3d.getTexture;
-    b3d.getTexture = function (drawing, pal) {
-        if (room3dPanel.gamePreviewMode) {
-            // handle drawing replacement tag
-            var altDrawing = editor3d.parseDrawTag(drawing);
-            drawing = altDrawing && altDrawing || drawing;
-        }
-        return getTextureOrig.call(b3d, drawing, pal);
-    };
-
     // set the rendering loop function
     b3d.engine.runRenderLoop(editor3d.update);
 
@@ -324,7 +313,8 @@ editor3d.onPointerUp = function (e) {
             if (mesh) {
                 mesh.position = editor3d.cursor.mesh.position;
                 // make sure to reapply additional transformation from tags
-                b3d.applyTransformTags(s, mesh);
+                // todo: won't be necessary soon
+                // b3d.applyTransformTags(s, mesh);
                 // update bitsyOrigin object to make sure mouse picking will work correctly
                 mesh.bitsyOrigin.x = s.x;
                 mesh.bitsyOrigin.y = s.y;
@@ -575,44 +565,9 @@ editor3d.update = function () {
     b3d.scene.render();
 };
 
-editor3d.parseDrawTag = function (drawing) {
-    // replace drawings marked with the #draw(TYPE,id) tag
-    var name = drawing.name || '';
-    var tag = name.match(/#draw\((TIL|SPR|ITM),([a-zA-Z0-9]+)\)/);
-    if (tag) {
-        var map;
-        // tag[1] is the first capturing group, it can be either TIL, SPR, or ITM
-        switch (tag[1]) {
-            case 'TIL':
-                map = bitsy.tile;
-                break;
-            case 'SPR':
-                map = bitsy.sprite;
-                break;
-            case 'ITM':
-                map = bitsy.item;
-                break;
-            default:
-                break;
-        }
-        // tag[2] is the second capturing group which returns drawing id
-        var id = tag[2];
-        var newDrawing = map[id];
-        if (newDrawing) {
-            return newDrawing;
-        } else {
-            console.error(`couldn't replace ${drawing.name}! there is no '${tag[1]} ${id}'`);
-        }
-    }
-};
-
 // UI
 // controls for editor panel
 var room3dPanel = {
-    // when false, replace drawing tags won't be applied,
-    // and drawings set to have empty meshes will have they regular visible meshes
-    gamePreviewMode: true,
-
     selectAdjacent: function(direction) {
         // direction should be 1 or -1
         // get every first room from every stack and then every stray room
