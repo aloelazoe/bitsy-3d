@@ -12,7 +12,6 @@ var b3d = {
     fogColor: 0,
 
     meshTemplates: {},
-
     baseMat: null,
 
     roomsInStack: {},
@@ -26,7 +25,7 @@ var b3d = {
     caches: {},
 };
 
-b3d.init = function(canvas) {
+b3d.init = function (canvas) {
     b3d.engine = new BABYLON.Engine(canvas, false);
     b3d.scene = new BABYLON.Scene(b3d.engine);
     b3d.scene.ambientColor = new BABYLON.Color3(1, 1, 1);
@@ -50,13 +49,12 @@ b3d.init = function(canvas) {
         });
     }
 
-    b3d.initRoomStacks();
+    b3d.parseData();
 };
 
-
-// stack helper functions
-b3d.initRoomStacks = function () {
-    // register room stacks here
+// parse config data serialized in stack and drawing names
+b3d.parseData = function () {
+    // register room stacks
     Object.values(bitsy.room).forEach(function (room) {
         var name = room.name || '';
         var tag = name.match(/#stack\(([a-zA-Z]+),(-?\.?\d*\.?\d*)\)/);
@@ -321,7 +319,6 @@ b3d.update = function () {
             mesh.bitsyOrigin.x = s.x;
             mesh.bitsyOrigin.y = s.y;
             mesh.bitsyOrigin.roomId = s.room;
-            b3d.applyTransformTags(s, mesh);
         } else {
         // otherwise remove the sprite
             mesh.dispose();
@@ -445,8 +442,8 @@ b3d.addMeshInstance = function (mesh, drawing, roomId, x, y) {
     instance.position.z = bitsy.mapsize - 1 - y;
     instance.position.y = b3d.stackPosOfRoom[roomId] && b3d.stackPosOfRoom[roomId].pos || 0;
 
-    // // 3d editor addition:
-    // // bitsyOrigin property to correctly determine corresponding bitsy drawing when mouse-picking
+    // 3d editor addition:
+    // bitsyOrigin property to correctly determine corresponding bitsy drawing when mouse-picking
     instance.bitsyOrigin = {
         drawing: drawing,
         x: x,
@@ -470,31 +467,32 @@ b3d.getColor = function (colorId) {
 
 b3d.applyTransformTags = function (drawing, mesh) {
     var name = drawing.name || '';
+
     // transform tags. #t(x,y,z): translate (move), #r(x,y,z): rotate, #s(x,y,z): scale
     // #m(1,0,0.5) and #m(1,,.5) are both examples of valid input
-    // scale
-    var scaleTag = name.match(/#s\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-    if (scaleTag) {
-        mesh.scaling = new BABYLON.Vector3(
-            Number(scaleTag[1]) || 0,
-            Number(scaleTag[2]) || 0,
-            Number(scaleTag[3]) || 0
-        );
-    }
-    // rotate. input in degrees
-    var rotateTag = name.match(/#r\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-    if (rotateTag) {
-        mesh.rotation.x += radians(Number(rotateTag[1]) || 0);
-        mesh.rotation.y += radians(Number(rotateTag[2]) || 0);
-        mesh.rotation.z += radians(Number(rotateTag[3]) || 0);
-    }
-    // translate (move)
-    var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/);
-    if (translateTag) {
-        mesh.position.x += (Number(translateTag[1]) || 0);
-        mesh.position.y += (Number(translateTag[2]) || 0);
-        mesh.position.z += (Number(translateTag[3]) || 0);
-    }
+    var scaleTag = name.match(/#s\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/) || [];
+    var rotateTag = name.match(/#r\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/) || [];
+    var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/) || [];
+
+    var matrix = BABYLON.Matrix.Compose(
+        new BABYLON.Vector3(
+            Number(scaleTag[1]) || 1,
+            Number(scaleTag[2]) || 1,
+            Number(scaleTag[3]) || 1
+        ),
+        BABYLON.Quaternion.FromEulerAngles(
+            radians(Number(rotateTag[1]) || 0),
+            radians(Number(rotateTag[2]) || 0),
+            radians(Number(rotateTag[3]) || 0)
+        ),
+        new BABYLON.Vector3(
+            (Number(translateTag[1]) || 0),
+            (Number(translateTag[2]) || 0),
+            (Number(translateTag[3]) || 0)
+        ),
+    );
+
+    mesh.setPreTransformMatrix(matrix);
 
     function radians(degrees) {
         return degrees * Math.PI / 180;

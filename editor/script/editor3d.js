@@ -190,7 +190,7 @@ editor3d.init = function() {
         // reset stack objects
         b3d.roomsInStack = {};
         b3d.stackPosOfRoom = {};
-        b3d.initRoomStacks();
+        b3d.parseData();
         // clear all caches to force all drawings to reset during the update
         b3d.removeFromCaches(Object.values(b3d.caches));
         // this fixes 3d editor crash when removing rooms right after modifying game data
