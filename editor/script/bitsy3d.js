@@ -69,8 +69,9 @@ b3d.parseData = function () {
         }
     });
     // parse mesh config
-    [].concat(Object.values(bitsy.item), Object.values(bitsy.tile), Object.values(bitsy.sprite)).forEach(function (drawing) {
+    [].concat(Object.values(bitsy.tile), Object.values(bitsy.sprite), Object.values(bitsy.item)).forEach(function (drawing) {
         b3d.meshConfig[drawing.drw] = {
+            drawing: drawing,
             type: b3d.parseMeshTag(drawing),
             transform: b3d.parseTransformTags(drawing),
             transparency: b3d.parseTransparentTag(drawing),
@@ -99,6 +100,64 @@ b3d.unregisterRoomFromStack = function (roomId) {
         delete b3d.roomsInStack[stackId];
     }
 };
+
+b3d.serializeMeshesAsDialog = function () {
+    var condensed = {};
+
+    Object.entries(b3d.meshConfig).forEach(function (entry) {
+        var id = entry[0]
+        var drawing = entry[1].drawing;
+
+        if (entry[1].type !== b3d.getDefaultMeshType(drawing)) {
+            condensed[id] = condensed[id] || {};
+            condensed[id].type = entry[1].type;
+        }
+        if (!entry[1].transform.isIdentity()) {
+            condensed[id] = condensed[id] || {};
+
+            // serialize transform matrix as an array:
+            // [ scaleX, scaleY, scaleZ,
+            //   rotationX, rotationY, rotationZ,
+            //   translationX, translationY, translationZ ]
+            var scale = new BABYLON.Vector3();
+            var rotation = new BABYLON.Quaternion();
+            var translation = new BABYLON.Vector3();
+
+            entry[1].transform.decompose(scale, rotation, translation);
+
+            condensed[id].transform = [].concat(
+                scale.asArray(),
+                rotation.toEulerAngles().asArray().map(function(n){return n * 180 / Math.PI}),
+                translation.asArray())
+                .map(function (n) {
+                    // adjust weird offsets that are apparently caused by float imprecision
+                    // it should be consistent with the editor input validation
+                    // that only allows 5 digits after the decimal point
+                    return Math.round(n * 100000) / 100000;
+                })
+                .toString();
+        }
+        if (entry[1].transparency !== b3d.getDefaultTransparency(drawing)) {
+            condensed[id] = condensed[id] || {};
+            condensed[id].transparency = entry[1].transparency;
+        }
+        if (entry[1].replacement) {
+            condensed[id] = condensed[id] || {};
+            condensed[id].replace = entry[1].replacement.drw;
+        }
+        if (entry[1].children) {
+            condensed[id] = condensed[id] || {};
+            condensed[id].children = entry[1].children.map(function (drawing) {
+                return drawing.drw;
+            });
+        }
+    });
+
+    var result = JSON.stringify(condensed, null, 2);
+    console.log(result);
+    bitsy.dialog['DATA3D'] = '"""\n' + result + '\n"""';
+}; // b3d.serializeMeshesAsDialog
+
 
 // returns the name of the drawing with it's mesh configuration serialized to name tags
 // or undefined if no serialization was needed
