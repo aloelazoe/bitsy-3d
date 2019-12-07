@@ -71,9 +71,9 @@ b3d.parseData = function () {
     // parse mesh config
     [].concat(Object.values(bitsy.item), Object.values(bitsy.tile), Object.values(bitsy.sprite)).forEach(function (drawing) {
         b3d.meshConfig[drawing.drw] = {
-            type: b3d.getMeshType(drawing),
+            type: b3d.parseMeshTag(drawing),
             transform: b3d.parseTransformTags(drawing),
-            transparency: b3d.isTransparent(drawing),
+            transparency: b3d.parseTransparentTag(drawing),
             replacement: b3d.parseDrawTag(drawing),
             children: b3d.parseChildrenTag(drawing),
         };
@@ -99,6 +99,72 @@ b3d.unregisterRoomFromStack = function (roomId) {
         delete b3d.roomsInStack[stackId];
     }
 };
+
+// returns the name of the drawing with it's mesh configuration serialized to name tags
+// or undefined if no serialization was needed
+b3d.serializeMeshAsNameTags = function (drawing) {
+    var config = b3d.meshConfig[drawing.drw];
+    var tags = '';
+
+    if (config.type !== b3d.getDefaultMeshType(drawing)) {
+        tags += `#mesh(${config.type})`;
+    }
+    if (!config.transform.isIdentity()) {
+        var scale = new BABYLON.Vector3();
+        var rotation = new BABYLON.Quaternion();
+        var translation = new BABYLON.Vector3();
+
+        config.transform.decompose(scale, rotation, translation);
+
+        // adjust weird offsets that are apparently caused by float imprecision
+        // it should be consistent with the editor input validation
+        // that only allows 5 digits after the decimal point
+        var adjusted = [].concat(
+            scale.asArray(),
+            rotation.toEulerAngles().asArray().map(function(n){return n * 180 / Math.PI}),
+            translation.asArray())
+            .map(function (n) {
+                return Math.round(n * 100000) / 100000;
+            });
+
+        if (adjusted[0] !== 1 || adjusted[1] !== 1 || adjusted[2] !== 1) {
+            // add spaces between tags
+            tags = tags && tags + ' ' || tags;
+            tags += `#s(${adjusted.slice(0,3).join()})`;
+        }
+        if (adjusted[3] !== 0 || adjusted[4] !== 0 || adjusted[5] !== 0) {
+            tags = tags && tags + ' ' || tags;
+            tags += `#r(${adjusted.slice(3,6).join()})`;
+        }
+        if (adjusted[6] !== 0 || adjusted[7] !== 0 || adjusted[8] !== 0) {
+            tags = tags && tags + ' ' || tags;
+            tags += `#t(${adjusted.slice(6).join()})`;
+        }
+
+    }
+    if (config.transparency !== b3d.getDefaultTransparency(drawing)) {
+        tags = tags && tags + ' ' || tags;
+        tags += `#transparent(${config.transparency})`;
+    }
+    if (config.replacement) {
+        tags = tags && tags + ' ' || tags;
+        tags += `#draw(${config.replacement.drw.split('_')})`;
+    }
+    if (config.children) {
+        tags = tags && tags + ' ' || tags;
+        tags += `#children(${config.children.map(function (drawing) {return drawing.drw;})})`;
+    }
+
+    if (tags) {
+        // first strip all exiting name-tags from the drawing's name
+        var newName = drawing.name && drawing.name.replace(/ ?#(mesh|draw|r|t|s|transparent|children)\([^]*?\)/gm, '') || '';
+        if (newName && newName[newName.length - 1] !== ' ') {
+            newName += ' ';
+        }
+        newName += tags;
+        return newName;
+    }
+}; // b3d.serializeMeshAsNameTags (drawing)
 
 b3d.initMeshTemplates = function () {
     var meshTemplates = {};
@@ -603,7 +669,7 @@ b3d.addChildren = function (drawing, mesh) {
     }
 };
 
-b3d.isTransparent = function (drawing) {
+b3d.parseTransparentTag = function (drawing) {
     var name = drawing.name || '';
     var match = name.match(/#transparent\(((true)|(false))\)/);
     if (match) {
@@ -617,7 +683,7 @@ b3d.getDefaultTransparency = function (drawing) {
     return !drawing.drw.includes('TIL');
 };
 
-b3d.getMeshType = function (drawing) {
+b3d.parseMeshTag = function (drawing) {
     var name = drawing.name || '';
     var meshMatch = name.match(/#mesh\((.+?)\)/);
     if (meshMatch) {
