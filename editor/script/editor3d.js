@@ -43,6 +43,7 @@ editor3d.init = function() {
     canvas.height = 512;
 
     b3d.init(canvas);
+    editor3d.suggestReplacingNameTags();
 
     // make a mesh for 3d cursor
     editor3d.cursor.mesh = BABYLON.MeshBuilder.CreateBox('cursor', { size: 1.1 }, b3d.scene);
@@ -180,6 +181,7 @@ editor3d.init = function() {
         b3d.roomsInStack = {};
         b3d.stackPosOfRoom = {};
         b3d.parseData();
+        editor3d.suggestReplacingNameTags();
         // clear all caches to force all drawings to reset during the update
         b3d.removeFromCaches(Object.values(b3d.caches));
         // this fixes 3d editor crash when removing rooms right after modifying game data
@@ -197,6 +199,28 @@ editor3d.init = function() {
         }
     }
 }; // editor3d.init()
+
+editor3d.suggestReplacingNameTags = function () {
+    // check if name tags are used and ask to delete them: new data format made them redundant 
+    var nameTagsRegex = / ?#(stack|mesh|draw|r|t|s|transparent|children)\([^]*?\)/gm;
+    var usesNameTags;
+    Object.values(bitsy.names).forEach(function (namesMap) {
+        namesMap.forEach(function (value, key) {
+            usesNameTags = usesNameTags || nameTagsRegex.test(key);
+        });
+    });
+    if (usesNameTags && window.confirm("3d editor uses new format for storing its data. it can read game data made for older versions of 3d hack that relied on name-tags, but it doesn't update existing name-tags when you make changes and prioritizes data in the new format when both kinds are present. you might want to delete name-tags to avoid confusion and make names less cluttered. do you want to delete them?")) {
+        [].concat(Object.values(bitsy.room), Object.values(bitsy.tile), Object.values(bitsy.sprite), Object.values(bitsy.item))
+        .forEach(function (entity) {
+            if (entity.name) {
+                entity.name = entity.name.replace(nameTagsRegex, '');
+            }
+        });
+        bitsy.updateNamesFromCurData();
+        b3d.serializeDataAsDialog();
+        bitsy.refreshGameData();
+    }
+};
 
 // initialize 3d editor
 document.addEventListener('DOMContentLoaded', function() {
@@ -223,10 +247,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 editor3d.addRoomToStack = function (roomId, stackId, pos) {
     var room = bitsy.room[roomId];
-    var tag = `#stack(${stackId},${pos})`;
-    room.name = room.name && ' ' + tag || tag;
-    bitsy.updateNamesFromCurData();
+    // var tag = `#stack(${stackId},${pos})`;
+    // room.name = room.name && ' ' + tag || tag;
+    // bitsy.updateNamesFromCurData();
     b3d.registerRoomInStack(roomId, stackId, pos);
+    b3d.serializeData();
+    bitsy.refreshGameData();
 };
 
 editor3d.newStackId = function () {
@@ -328,6 +354,7 @@ editor3d.onPointerUp = function (e) {
             });
         }
         bitsy.selectRoom(editor3d.cursor.curRoomId);
+        b3d.serializeData();
         bitsy.refreshGameData();
     // if cursor mode is 'select' or 'remove' picked mesh is not falsy
     } else if (editor3d.cursor.pickedMesh) {
@@ -632,6 +659,7 @@ var room3dPanel = {
                 delete room[roomId];
                 b3d.unregisterRoomFromStack(roomId);
             });
+            b3d.serializeData();
             bitsy.refreshGameData();
 
             bitsy.markerTool.Clear();

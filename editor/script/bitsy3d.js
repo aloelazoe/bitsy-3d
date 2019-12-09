@@ -55,11 +55,18 @@ b3d.init = function (canvas) {
         });
     }
 
+    // initialize b3d.meshConfig, b3d.roomsInStack and b3d.stackPosOfRoom by parsing serialized data
     b3d.parseData();
 };
 
-// parse data serialized in stack and drawing names
 b3d.parseData = function () {
+    if (!b3d.parseDataFromDialog()) {
+        b3d.parseDataFromNameTags();
+    }
+}
+
+// parse data serialized in stack and drawing names
+b3d.parseDataFromNameTags = function () {
     // register room stacks
     Object.values(bitsy.room).forEach(function (room) {
         var name = room.name || '';
@@ -70,20 +77,117 @@ b3d.parseData = function () {
     });
     // parse mesh config
     [].concat(Object.values(bitsy.tile), Object.values(bitsy.sprite), Object.values(bitsy.item)).forEach(function (drawing) {
-        b3d.meshConfig[drawing.drw] = {
-            drawing: drawing,
-            type: b3d.parseMeshTag(drawing),
-            transform: b3d.parseTransformTags(drawing),
-            transparency: b3d.parseTransparentTag(drawing),
-            replacement: b3d.parseDrawTag(drawing),
-            children: b3d.parseChildrenTag(drawing),
-        };
+        var config = b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
+        config.type = b3d.parseMeshTag(drawing) || config.type;
+        config.transparency = b3d.parseTransparentTag(drawing) === undefined && config.transparency || b3d.parseTransparentTag(drawing);
+        config.transform = b3d.parseTransformTags(drawing);
+        config.replacement = b3d.parseDrawTag(drawing);
+        config.children = b3d.parseChildrenTag(drawing);
     });
+};
+
+// return true if data was parsed successfully and false if it was initiazlied with default values
+b3d.parseDataFromDialog = function () {
+    var serialized = bitsy.dialog['DATA3D'];
+    var parsed;
+    if (serialized) {
+        // remove bitsy multiline dialog tokens if there are any
+        serialized = serialized.replace('"""\n', '');
+        serialized = serialized.replace('\n"""', '');
+        var parsed = JSON.parse(serialized);
+    }
+
+    // parse mesh config
+    // b3d.meshConfig should contain configuration for every drawing
+    // all objects must have drawing, type, and transparency properties set by b3d.getDefaultMeshProps,
+    // and other properties are optional
+    [].concat(Object.values(bitsy.tile), Object.values(bitsy.sprite), Object.values(bitsy.item)).forEach(function (drawing) {
+        var parsedConfig = parsed && parsed.mesh[drawing.drw] || {};
+        var config = b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
+        config.type = parsedConfig.type || config.type;
+        config.transparency = parsedConfig.hasOwnProperty('transparency') ? parsedConfig.transparency : config.transparency;
+        config.transform = parsedConfig.transform && b3d.parseTransform(parsedConfig.transform);
+        config.replacement = parsedConfig.replacement && b3d.getDrw(parsedConfig.replacement);
+        config.children = parsedConfig.children && parsedConfig.children.map(b3d.getDrw);
+    });
+
+    // parse stacks
+    if (parsed && parsed.stack) {
+        Object.entries(parsed.stack).forEach(function (entry) {
+            var stackId = entry[0];
+            var roomList = entry[1];
+            roomList.forEach(function (room) {
+                b3d.registerRoomInStack(room.id, stackId, room.pos);
+            });
+        });
+    }
+
+    return Boolean(serialized);
+};
+
+b3d.getDefaultMeshProps = function (drawing) {
+    return {
+        drawing: drawing,
+        type: b3d.getDefaultMeshType(drawing),
+        transparency: b3d.getDefaultTransparency(drawing),
+    };
+};
+
+b3d.parseTransform = function (str) {
+    var arr = str.split(',');
+
+    var matrix = BABYLON.Matrix.Compose(
+            // scale
+            new BABYLON.Vector3(
+                Number(arr[0]) || 1,
+                Number(arr[1]) || 1,
+                Number(arr[2]) || 1
+            ),
+            // rotation
+            BABYLON.Quaternion.FromEulerAngles(
+                (Number(arr[3]) || 0) * Math.PI / 180,
+                (Number(arr[4]) || 0) * Math.PI / 180,
+                (Number(arr[5]) || 0) * Math.PI / 180
+            ),
+            // translation
+            new BABYLON.Vector3(
+                Number(arr[6]) || 0,
+                Number(arr[7]) || 0,
+                Number(arr[8]) || 0
+            ),
+        );
+
+    return matrix;
+};
+
+// helper function
+// finds drawing object by its full id i.g. 'SPR_A'
+b3d.getDrw = function (drw) {
+    var map;
+    var typeAndId = drw.split('_');
+    switch (typeAndId[0]) {
+        case 'TIL':
+            map = bitsy.tile;
+            break;
+        case 'SPR':
+            map = bitsy.sprite;
+            break;
+        case 'ITM':
+            map = bitsy.item;
+            break;
+        default:
+            break;
+    }
+    return map[ typeAndId[1] ];
 };
 
 b3d.registerRoomInStack = function (roomId, stackId, pos) {
     b3d.roomsInStack[stackId] = b3d.roomsInStack[stackId] || [];
-    b3d.roomsInStack[stackId].push(roomId);
+    // add room to the list if it is not already there
+    if (b3d.roomsInStack[stackId].indexOf(roomId) === -1) {
+        b3d.roomsInStack[stackId].push(roomId);
+    }
+    // add or update position of the room in the stack
     b3d.stackPosOfRoom[roomId] = {
         stack: stackId,
         pos: pos,
@@ -101,20 +205,35 @@ b3d.unregisterRoomFromStack = function (roomId) {
     }
 };
 
-b3d.serializeMeshesAsDialog = function () {
-    var condensed = {};
+b3d.serializeDataAsDialog = function () {
+    // serialize stack data
+    var stackSerialized = {};
+    Object.entries(b3d.roomsInStack).forEach(function (entry) {
+        var stackId = entry[0];
+        var roomList = entry[1];
+        stackSerialized[stackId] = stackSerialized[stackId] || [];
+        roomList.forEach(function (roomId) {
+            stackSerialized[stackId].push({
+                id: roomId,
+                pos: b3d.stackPosOfRoom[roomId].pos,
+            });
+        });
+    });
+
+    // serialize mesh data
+    var meshSerialized = {};
 
     Object.entries(b3d.meshConfig).forEach(function (entry) {
         var id = entry[0]
-        var drawing = entry[1].drawing;
+        var config = entry[1];
+        var drawing = config.drawing;
 
-        if (entry[1].type !== b3d.getDefaultMeshType(drawing)) {
-            condensed[id] = condensed[id] || {};
-            condensed[id].type = entry[1].type;
+        var configSerialized = {};
+
+        if (config.type !== b3d.getDefaultMeshType(drawing)) {
+            configSerialized.type = config.type;
         }
-        if (!entry[1].transform.isIdentity()) {
-            condensed[id] = condensed[id] || {};
-
+        if (config.transform && !config.transform.isIdentity()) {
             // serialize transform matrix as an array:
             // [ scaleX, scaleY, scaleZ,
             //   rotationX, rotationY, rotationZ,
@@ -123,9 +242,9 @@ b3d.serializeMeshesAsDialog = function () {
             var rotation = new BABYLON.Quaternion();
             var translation = new BABYLON.Vector3();
 
-            entry[1].transform.decompose(scale, rotation, translation);
+            config.transform.decompose(scale, rotation, translation);
 
-            condensed[id].transform = [].concat(
+            configSerialized.transform = [].concat(
                 scale.asArray(),
                 rotation.toEulerAngles().asArray().map(function(n){return n * 180 / Math.PI}),
                 translation.asArray())
@@ -137,27 +256,32 @@ b3d.serializeMeshesAsDialog = function () {
                 })
                 .toString();
         }
-        if (entry[1].transparency !== b3d.getDefaultTransparency(drawing)) {
-            condensed[id] = condensed[id] || {};
-            condensed[id].transparency = entry[1].transparency;
+        if (config.transparency !== b3d.getDefaultTransparency(drawing)) {
+            configSerialized.transparency = config.transparency;
         }
-        if (entry[1].replacement) {
-            condensed[id] = condensed[id] || {};
-            condensed[id].replace = entry[1].replacement.drw;
+        if (config.replacement) {
+            configSerialized.replacement = config.replacement.drw;
         }
-        if (entry[1].children) {
-            condensed[id] = condensed[id] || {};
-            condensed[id].children = entry[1].children.map(function (drawing) {
+        if (config.children) {
+            configSerialized.children = config.children.map(function (drawing) {
                 return drawing.drw;
             });
         }
+
+        if (Object.values(configSerialized).length > 0) {
+            meshSerialized[id] = configSerialized;
+        }
     });
 
-    var result = JSON.stringify(condensed, null, 2);
-    console.log(result);
+    var result = JSON.stringify({
+        mesh: meshSerialized,
+        stack: stackSerialized
+    }, null, 2);
+    // console.log(result);
     bitsy.dialog['DATA3D'] = '"""\n' + result + '\n"""';
-}; // b3d.serializeMeshesAsDialog
+}; // b3d.serializeDataAsDialog
 
+b3d.serializeData = b3d.serializeDataAsDialog;
 
 // returns the name of the drawing with it's mesh configuration serialized to name tags
 // or undefined if no serialization was needed
@@ -622,7 +746,7 @@ b3d.parseTransformTags = function (drawing) {
     var translateTag = name.match(/#t\((-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?,(-?\.?\d*\.?\d*)?\)/) || [];
 
     var matrix;
-    if (scaleTag || rotateTag || translateTag) {
+    if (scaleTag.length > 0 || rotateTag.length > 0 || translateTag.length > 0) {
         matrix = BABYLON.Matrix.Compose(
             new BABYLON.Vector3(
                 Number(scaleTag[1]) || 1,
@@ -735,7 +859,6 @@ b3d.parseTransparentTag = function (drawing) {
         // 2nd capturing group reserved for 'true' will be undefined if the input said 'false'
         return Boolean(match[2]);
     }
-    return b3d.getDefaultTransparency(drawing);
 };
 
 b3d.getDefaultTransparency = function (drawing) {
@@ -758,7 +881,6 @@ b3d.parseMeshTag = function (drawing) {
             console.error(`mesh template '${meshMatch[1]}' wasn't found`);
         }
     }
-    return b3d.getDefaultMeshType(drawing);
 };
 
 b3d.getDefaultMeshType = function (drawing) {
