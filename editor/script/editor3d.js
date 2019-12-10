@@ -180,6 +180,7 @@ editor3d.init = function() {
         // reset stack objects
         b3d.roomsInStack = {};
         b3d.stackPosOfRoom = {};
+        b3d.meshConfig = {};
         b3d.parseData();
         editor3d.suggestReplacingNameTags();
         // clear all caches to force all drawings to reset during the update
@@ -188,17 +189,39 @@ editor3d.init = function() {
         bitsy.selectRoom(bitsy.curRoom);
     });
 
-    // patch delete room function
-    var deleteRoomOrig = bitsy.deleteRoom;
-    bitsy.deleteRoom = function() {
-        var deletedRoom = bitsy.curRoom;
-        deleteRoomOrig.call();
-        // check if the room was actually deleted after the dialog
-        if (bitsy.curRoom !== deletedRoom) {
-            b3d.unregisterRoomFromStack(deletedRoom);
+    // patch refreshGameData function to include 3d data
+    editor3d.patch(bitsy, 'refreshGameData', function () {
+        b3d.serializeData();
+    });
+
+    // patch delete room function to fix crash when deleting rooms from vanilla room panel
+    editor3d.patch(bitsy, 'deleteRoom',
+        function () {
+            editor3d._patchContext.deletedRoom = bitsy.curRoom;
+        },
+        function () {
+            // check if the room was actually deleted after the dialog
+            var deletedRoom = editor3d._patchContext.deletedRoom;
+            if (bitsy.curRoom !== deletedRoom) {
+                b3d.unregisterRoomFromStack(deletedRoom);
+            }
+            delete editor3d._patchContext.deletedRoom;
         }
-    }
+    );
 }; // editor3d.init()
+
+// helper function to patch functions
+editor3d.patch = function (scope, name, before, after) {
+    var original = scope[name];
+    var patched = function () {
+        if (before) before.apply(scope, arguments);
+        var output = original.apply(scope, arguments);
+        if (after) after.apply(scope, arguments);
+        return output;
+    }
+    scope[name] = patched;
+};
+editor3d._patchContext = {};
 
 editor3d.suggestReplacingNameTags = function () {
     // check if name tags are used and ask to delete them: new data format made them redundant 
@@ -217,7 +240,6 @@ editor3d.suggestReplacingNameTags = function () {
             }
         });
         bitsy.updateNamesFromCurData();
-        b3d.serializeDataAsDialog();
         bitsy.refreshGameData();
     }
 };
@@ -251,7 +273,6 @@ editor3d.addRoomToStack = function (roomId, stackId, pos) {
     // room.name = room.name && ' ' + tag || tag;
     // bitsy.updateNamesFromCurData();
     b3d.registerRoomInStack(roomId, stackId, pos);
-    b3d.serializeData();
     bitsy.refreshGameData();
 };
 
@@ -354,7 +375,6 @@ editor3d.onPointerUp = function (e) {
             });
         }
         bitsy.selectRoom(editor3d.cursor.curRoomId);
-        b3d.serializeData();
         bitsy.refreshGameData();
     // if cursor mode is 'select' or 'remove' picked mesh is not falsy
     } else if (editor3d.cursor.pickedMesh) {
@@ -659,7 +679,6 @@ var room3dPanel = {
                 delete room[roomId];
                 b3d.unregisterRoomFromStack(roomId);
             });
-            b3d.serializeData();
             bitsy.refreshGameData();
 
             bitsy.markerTool.Clear();
