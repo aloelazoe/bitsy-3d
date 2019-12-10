@@ -467,9 +467,9 @@ b3d.getCache = function (cacheName, make) {
     };
 };
 
+b3d._tempTransparencyCanvas = document.createElement('canvas');
 b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal) {
     var canvas = bitsy.renderer.GetImage(drawing, pal);
-    var ctx = canvas.getContext('2d');
 
     var tex = new BABYLON.DynamicTexture('test', {
         width: canvas.width,
@@ -479,10 +479,14 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal) {
     tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
 
     if (b3d.meshConfig[drawing.drw].transparency) {
+        // to create texture with transparency, swap the original bitsy drawing
+        // with the copy that will have its background-colored pixels set to be transparent
+        // original drawing should be preserved to be able to switch to non-transparent
+        // version and to avoid bugs in the editor
+        var copyCtx = b3d._tempTransparencyCanvas.getContext('2d');
+        copyCtx.drawImage(canvas, 0, 0);
         tex.hasAlpha = true;
-        // from transparent sprites hack
-        // redraw image context with all bg pixels transparent
-        var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var data = copyCtx.getImageData(0, 0, canvas.width, canvas.height);
         var bg = bitsy.getPal(pal)[0];
         for (let i = 0; i < data.data.length; i += 4) {
             var r = data.data[i];
@@ -492,7 +496,8 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal) {
                 data.data[i + 3] = 0;
             }
         }
-        ctx.putImageData(data, 0, 0);
+        copyCtx.putImageData(data, 0, 0);
+        var canvas = b3d._tempTransparencyCanvas;
     }
     var texCtx = tex.getContext();
     texCtx.drawImage(canvas, 0, 0);
