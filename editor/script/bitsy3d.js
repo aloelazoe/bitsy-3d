@@ -551,7 +551,7 @@ b3d.getMesh = function (drawing, pal) {
     return b3d.getMeshFromCache(key, [drawing, pal, type]);
 };
 
-b3d.removeFromCaches = function (cachesArr, drw, frame, col, pal) {
+b3d.clearCaches = function (cachesArr, drw, frame, col, pal) {
     var r = new RegExp(`${drw || '\\D\\D\\D_\\w+?'},${frame || '\\d*?'},${col || '\\d*?'},${pal || '\\d*'}`);
     cachesArr.forEach(function(cache) {
         Object.keys(cache)
@@ -563,12 +563,16 @@ b3d.removeFromCaches = function (cachesArr, drw, frame, col, pal) {
     });
 }
 
-b3d.updateColor = function (pal) {
-    b3d.removeFromCaches(Object.values(b3d.caches), null, null, null, pal);
+b3d.clearCachesPalette = function (pal) {
+    b3d.clearCaches(Object.values(b3d.caches), null, null, null, pal);
 };
 
-b3d.updateTexture = function (drw, frame) {
-    b3d.removeFromCaches(Object.values(b3d.caches), drw, frame, null, null);
+b3d.clearCachesTexture = function (drw, frame) {
+    b3d.clearCaches(Object.values(b3d.caches), drw, frame, null, null);
+};
+
+b3d.clearCachesMesh = function (drw) {
+    b3d.clearCaches([b3d.caches.mesh], drw, null, null, null);
 };
 
 b3d.update = function () {

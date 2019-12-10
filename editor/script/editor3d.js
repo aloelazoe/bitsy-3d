@@ -162,7 +162,7 @@ editor3d.init = function() {
     // update textures when pallete is changed
     bitsy.events.Listen('palette_change', function(event) {
         if (bitsy.paletteTool){
-            b3d.updateColor(bitsy.paletteTool.GetSelectedId());
+            b3d.clearCachesPalette(bitsy.paletteTool.GetSelectedId());
         }
         // console.log('palette change event hiya hey');
     });
@@ -171,7 +171,7 @@ editor3d.init = function() {
     // this relies on event listeners being called in order
     // it should work in any browser that implements dom3 events
     document.getElementById('paint').addEventListener('mouseup', function(e) {
-        b3d.updateTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
+        b3d.clearCachesTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
         console.log('PAINT EVENT');
     });
 
@@ -184,7 +184,7 @@ editor3d.init = function() {
         b3d.parseData();
         editor3d.suggestReplacingNameTags();
         // clear all caches to force all drawings to reset during the update
-        b3d.removeFromCaches(Object.values(b3d.caches));
+        b3d.clearCaches(Object.values(b3d.caches));
         // this fixes 3d editor crash when removing rooms right after modifying game data
         bitsy.selectRoom(bitsy.curRoom);
     });
