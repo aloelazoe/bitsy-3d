@@ -17,6 +17,9 @@ var editor3d = {
     curSelectedMesh: null,
 
     groundMesh: null,
+
+    // track what drawing is selected
+    lastSelectedDrawing: null,
 };
 
 editor3d.cursor = {
@@ -634,6 +637,13 @@ editor3d.update = function () {
     }
 
     b3d.scene.render();
+
+    // check for changes in the environment and update ui
+    if (editor3d.lastSelectedDrawing !== bitsy.drawing.getEngineObject()) {
+        editor3d.lastSelectedDrawing = bitsy.drawing.getEngineObject();
+        // console.log('NEW DRAWING WAS SELECTED');
+        meshPanel.updateSelection();
+    }
 };
 
 // UI
