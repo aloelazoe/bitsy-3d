@@ -722,12 +722,14 @@ var room3dPanel = {
 // set up and respond to ui elements in mesh panel
 var meshPanel = {
     subTypePrefixes: ['tower'],
+    typeSelectEl: null,
+    subTypeSelectEl: null,
 
     init: function() {
-        // set up type selection
-        var meshTypeSelectEl = document.getElementById('meshTypeSelect');
-        var meshSubTypeSelectEl = document.getElementById('meshSubTypeSelect');
+        meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
+        meshPanel.subTypeSelectEl = document.getElementById('meshSubTypeSelect');
 
+        // set up type selection
         Object.keys(b3d.meshTemplates).forEach(function(templateName) {
             // check if the template name needs to be broken down between two select elements
             meshPanel.subTypePrefixes.forEach(function(p) {
@@ -735,43 +737,63 @@ var meshPanel = {
                     var suffix = templateName.slice(p.length);
                     var option = document.createElement('option');
                     option.text = option.value = suffix;
-                    meshSubTypeSelectEl.add(option);
+                    meshPanel.subTypeSelectEl.add(option);
                     templateName = p;
                 }
             });
             
-            if (Array.prototype.some.call(meshTypeSelectEl.options, function(o) {return o.text === templateName;})) {
+            if (Array.prototype.some.call(meshPanel.typeSelectEl.options, function(o) {return o.text === templateName;})) {
                 return;
             }
 
             var option = document.createElement('option');
             option.text = option.value = templateName;
 
-            meshTypeSelectEl.add(option);
+            meshPanel.typeSelectEl.add(option);
             // todo: set an option as currently selected depending on currently selected drawing
             // abstract into a separate function
             // since this would need to be updated whenever a different drawing is selected
             // option.selected = true;
         });
-        meshPanel.onChangeType();
+
+        meshPanel.updateSelection();
+    },
+
+    updateSelection: function () {
+        meshPanel.updateType();
+    },
+
+    updateType: function () {
+        var drawing = bitsy.drawing.getEngineObject();
+        var type = b3d.meshConfig[drawing.drw].type;
+        var prefix = meshPanel.subTypePrefixes.find(function (a) {return type.indexOf(a) !== -1});
+        if (prefix) {
+            var suffix = type.slice(prefix.length);
+            Array.prototype.find.call(meshPanel.typeSelectEl.options, function(o) {return o.value === prefix}).selected = true;
+            Array.prototype.find.call(meshPanel.subTypeSelectEl.options, function(o) {return o.value === suffix}).selected = true;
+            meshPanel.subTypeSelectEl.setAttribute('style', 'display:initial;');
+        } else {
+            Array.prototype.find.call(meshPanel.typeSelectEl.options, function(o) {return o.value === type}).selected = true;
+            meshPanel.subTypeSelectEl.setAttribute('style', 'display:none;');
+        }
     },
 
     onChangeType: function() {
-        var meshTypeSelectEl = document.getElementById('meshTypeSelect');
-        var meshSubTypeSelectEl = document.getElementById('meshSubTypeSelect');
-
-        var curMeshType = meshTypeSelectEl.value;
+        var curMeshType = meshPanel.typeSelectEl.value;
 
         meshPanel.subTypePrefixes.forEach(function(p) {
             if (curMeshType.startsWith(p)) {
-                meshSubTypeSelectEl.setAttribute('style', 'display:initial;');
-                curMeshType += meshSubTypeSelectEl.value;
+                meshPanel.subTypeSelectEl.setAttribute('style', 'display:initial;');
+                curMeshType += meshPanel.subTypeSelectEl.value;
             } else {
-                meshSubTypeSelectEl.setAttribute('style', 'display:none;');
+                meshPanel.subTypeSelectEl.setAttribute('style', 'display:none;');
             }
         });
 
-        console.log('meshTypeSelect changed: ' + curMeshType);
+        var drawing = bitsy.drawing.getEngineObject();
+        b3d.meshConfig[drawing.drw].type = curMeshType;
+        b3d.clearCachesMesh(drawing.drw);
+        bitsy.refreshGameData();
     },
 
     onChangeTransparency: function() {
