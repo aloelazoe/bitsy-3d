@@ -170,9 +170,10 @@ editor3d.init = function() {
     // update texture for the current drawing when editing with paint tool
     // this relies on event listeners being called in order
     // it should work in any browser that implements dom3 events
-    document.getElementById('paint').addEventListener('mouseup', function(e) {
-        b3d.clearCachesTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
-        console.log('PAINT EVENT');
+    // listen to the next mouseup event anywhere in the document to make sure
+    // textures will get updated even if the stroke is finished outside of the canvas
+    document.getElementById('paint').addEventListener('mousedown', function (e) {
+        document.addEventListener('mouseup', editor3d.updateTextureOneTimeListener);
     });
 
     bitsy.events.Listen("game_data_change", function() {
@@ -236,6 +237,15 @@ editor3d.patch = function (scope, name, before, after) {
     scope[name] = patched;
 };
 editor3d._patchContext = {};
+
+// clear caches to force textures and meshes to update
+editor3d.updateTextureOneTimeListener = function(e) {
+    b3d.clearCachesTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
+    // also clear mesh and materials caches to make sure meshes that use updated drawing as a replacement
+    // will get updated too, instead of continuing to point to a deleted texture
+    b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
+    document.removeEventListener('mouseup', editor3d.updateTextureOneTimeListener);
+};
 
 editor3d.suggestReplacingNameTags = function () {
     // check if name tags are used and ask to delete them: new data format made them redundant 
