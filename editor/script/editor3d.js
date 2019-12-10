@@ -724,10 +724,12 @@ var meshPanel = {
     subTypePrefixes: ['tower'],
     typeSelectEl: null,
     subTypeSelectEl: null,
+    transparencyCheckEl: null,
 
     init: function() {
         meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
         meshPanel.subTypeSelectEl = document.getElementById('meshSubTypeSelect');
+        meshPanel.transparencyCheckEl = document.getElementById('meshTransparencyCheck');
 
         // set up type selection
         Object.keys(b3d.meshTemplates).forEach(function(templateName) {
@@ -761,6 +763,7 @@ var meshPanel = {
 
     updateSelection: function () {
         meshPanel.updateType();
+        meshPanel.updateTransparency();
     },
 
     updateType: function () {
@@ -796,8 +799,18 @@ var meshPanel = {
         bitsy.refreshGameData();
     },
 
+    updateTransparency: function() {
+        var drawing = bitsy.drawing.getEngineObject();
+        meshPanel.transparencyCheckEl.checked = b3d.meshConfig[drawing.drw].transparency;
+    },
+
     onChangeTransparency: function() {
-        // body...
+        var drawing = bitsy.drawing.getEngineObject();
+        b3d.meshConfig[drawing.drw].transparency = meshPanel.transparencyCheckEl.checked;
+        b3d.clearCachesTexture(drawing.drw);
+        b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
+        // b3d.clearCaches(Object.values(b3d.caches));
+        bitsy.refreshGameData();
     },
 
     onToggleTransform: function() {
