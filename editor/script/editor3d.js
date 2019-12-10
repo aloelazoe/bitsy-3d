@@ -208,6 +208,19 @@ editor3d.init = function() {
             delete editor3d._patchContext.deletedRoom;
         }
     );
+
+    // update b3d.meshConfig when drawings are added, duplicated and deleted
+    ['newDrawing', 'duplicateDrawing'].forEach(function (f) {
+        editor3d.patch(bitsy, f, null, function () {
+            var drawing = bitsy.drawing.getEngineObject();
+            b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
+        });
+    });
+    editor3d.patch(bitsy, 'deleteDrawing', null, function () {
+        var drawing = bitsy.drawing.getEngineObject();
+        delete b3d.meshConfig[drawing.drw];
+    });
+    
 }; // editor3d.init()
 
 // helper function to patch functions
