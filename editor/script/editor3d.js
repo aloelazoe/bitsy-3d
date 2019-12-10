@@ -204,6 +204,7 @@ editor3d.init = function() {
             var deletedRoom = editor3d._patchContext.deletedRoom;
             if (bitsy.curRoom !== deletedRoom) {
                 b3d.unregisterRoomFromStack(deletedRoom);
+                bitsy.refreshGameData();
             }
             delete editor3d._patchContext.deletedRoom;
         }
