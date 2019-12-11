@@ -468,7 +468,7 @@ b3d.getCache = function (cacheName, make) {
 };
 
 b3d._tempTransparencyCanvas = document.createElement('canvas');
-b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal) {
+b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparency) {
     var canvas = bitsy.renderer.GetImage(drawing, pal);
 
     var tex = new BABYLON.DynamicTexture('test', {
@@ -478,7 +478,7 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal) {
 
     tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
 
-    if (b3d.meshConfig[drawing.drw].transparency) {
+    if (transparency) {
         // to create texture with transparency, swap the original bitsy drawing
         // with the copy that will have its background-colored pixels set to be transparent
         // original drawing should be preserved to be able to switch to non-transparent
@@ -505,7 +505,7 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal) {
     return tex;
 });
 
-b3d.getTexture = function (drawing, pal) {
+b3d.getTexture = function (drawing, pal, transparency) {
     if (!b3d.debugView) {
         // apply drawing replacement
         var altDrawing = b3d.meshConfig[drawing.drw].replacement;
@@ -514,30 +514,30 @@ b3d.getTexture = function (drawing, pal) {
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
-    var key = `${drw},${frame},${col},${pal}`;
-    return b3d.getTextureFromCache(key, [drawing, pal]);
+    var key = `${drw},${frame},${col},${pal},${transparency}`;
+    return b3d.getTextureFromCache(key, [drawing, pal, transparency]);
 };
 
-b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal) {
+b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal, transparency) {
     var mat = b3d.baseMat.clone();
-    mat.diffuseTexture = b3d.getTexture(drawing, pal);
+    mat.diffuseTexture = b3d.getTexture(drawing, pal, transparency);
     mat.freeze();
     return mat;
 });
 
-b3d.getMaterial = function (drawing, pal) {
+b3d.getMaterial = function (drawing, pal, transparency) {
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
-    var key = `${drw},${frame},${col},${pal}`;
-    return b3d.getMaterialFromCache(key, [drawing, pal]);
+    var key = `${drw},${frame},${col},${pal},${transparency}`;
+    return b3d.getMaterialFromCache(key, [drawing, pal, transparency]);
 };
 
 b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, type) {
     var mesh = b3d.meshTemplates[type].clone();
     mesh.makeGeometryUnique();
     mesh.isVisible = false;
-    mesh.material = b3d.getMaterial(drawing, pal);
+    mesh.material = b3d.getMaterial(drawing, pal, b3d.meshConfig[drawing.drw].transparency);
     // enable vertical tiling for towers
     if (type.startsWith('tower')) {
         mesh.material.diffuseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
