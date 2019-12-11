@@ -221,10 +221,15 @@ editor3d.init = function() {
             b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
         });
     });
-    editor3d.patch(bitsy, 'deleteDrawing', null, function () {
-        var drawing = bitsy.drawing.getEngineObject();
-        delete b3d.meshConfig[drawing.drw];
-    });
+    editor3d.patch(bitsy, 'deleteDrawing',
+       function () {
+            editor3d._patchContext.deletedDrawingId = bitsy.drawing.getEngineObject().drw;
+        },
+        function () {
+            delete b3d.meshConfig[editor3d._patchContext.deletedDrawingId];
+            delete editor3d._patchContext.deletedDrawingId;
+        }
+    );
     
 }; // editor3d.init()
 
