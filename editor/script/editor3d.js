@@ -835,6 +835,7 @@ var meshPanel = {
         var drawing = bitsy.drawing.getEngineObject();
         b3d.meshConfig[drawing.drw].type = curMeshType;
         b3d.clearCachesMesh(drawing.drw);
+        bitsy.refreshGameData();
     },
 
     updateTransparency: function() {
