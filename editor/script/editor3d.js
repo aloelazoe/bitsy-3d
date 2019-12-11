@@ -739,12 +739,33 @@ var meshPanel = {
     subTypePrefixes: ['tower'],
     typeSelectEl: null,
     subTypeSelectEl: null,
+
     transparencyCheckEl: null,
+
+    // this order corresponds with the order of values in serizlized transform
+    transformElementNamesOrdered: [
+        'transformScaleX', 'transformScaleY', 'transformScaleZ',
+        'transformRotationX', 'transformRotationY', 'transformRotationZ',
+        'transformTranslationX', 'transformTranslationY', 'transformTranslationZ' ],
+    transformInputEls: [],
+    transformValidatedNumbers: [1,1,1, 0,0,0, 0,0,0],
 
     init: function() {
         meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
         meshPanel.subTypeSelectEl = document.getElementById('meshSubTypeSelect');
         meshPanel.transparencyCheckEl = document.getElementById('meshTransparencyCheck');
+
+        // find transform input elements
+        meshPanel.transformElementNamesOrdered.forEach(function (id) {
+            meshPanel.transformInputEls.push(document.getElementById(id));
+        });
+        meshPanel.transformInputEls.forEach(function (el) {
+            el.addEventListener('input', meshPanel.onChangeTransform);
+            el.addEventListener('change', function (event) {
+                var index = meshPanel.transformElementNamesOrdered.indexOf(event.target.id);
+                event.target.value = meshPanel.transformValidatedNumbers[index];
+            });
+        });
 
         // set up type selection
         Object.keys(b3d.meshTemplates).forEach(function(templateName) {
@@ -774,11 +795,14 @@ var meshPanel = {
         });
 
         meshPanel.updateSelection();
+
+        meshPanel.onToggleTransform();
     },
 
     updateSelection: function () {
         meshPanel.updateType();
         meshPanel.updateTransparency();
+        meshPanel.updateTransform();
     },
 
     updateType: function () {
@@ -811,7 +835,6 @@ var meshPanel = {
         var drawing = bitsy.drawing.getEngineObject();
         b3d.meshConfig[drawing.drw].type = curMeshType;
         b3d.clearCachesMesh(drawing.drw);
-        bitsy.refreshGameData();
     },
 
     updateTransparency: function() {
@@ -829,13 +852,64 @@ var meshPanel = {
     },
 
     onToggleTransform: function() {
-        if ( document.getElementById('meshTransformCheck').checked ) {
-            document.getElementById('meshTransform').setAttribute('style','display:block;');
-            document.getElementById('meshTransformCheckIcon').innerHTML = 'expand_more';
+        if ( document.getElementById('transformCheck').checked ) {
+            document.getElementById('transform').setAttribute('style','display:block;');
+            document.getElementById('transformCheckIcon').innerHTML = 'expand_more';
         } else {
-            document.getElementById('meshTransform').setAttribute('style','display:none;');
-            document.getElementById('meshTransformCheckIcon').innerHTML = 'expand_less';
+            document.getElementById('transform').setAttribute('style','display:none;');
+            document.getElementById('transformCheckIcon').innerHTML = 'expand_less';
         }
+    },
+
+    updateTransform: function (argument) {
+        var drawing = bitsy.drawing.getEngineObject();
+        var transform = b3d.meshConfig[drawing.drw].transform;
+        if (transform) {
+            meshPanel.transformValidatedNumbers = b3d.serializeTransform(transform);
+        } else {
+            meshPanel.transformValidatedNumbers = [1,1,1, 0,0,0, 0,0,0];
+        }
+        meshPanel.transformInputEls.forEach(function (el, i) {
+            el.value = meshPanel.transformValidatedNumbers[i];
+        });
+    },
+
+    // to be called whenever the value of any of the transform input elements is changed by the user
+    onChangeTransform: function (event) {
+        // depending on the user input there could be different combinations
+        // of what is displayed in the input element and what is stored
+        // as a valid input to be used for updating actual game data
+        // * if input is an empty string, minus sign or dot, show it as it is but store default value
+        // * if input is NaN, store and show default value
+        // * if input is a number, show it with number of digits after decimal point
+        //   truncated to 5 maximum
+        var value = event.target.value;
+        var index = meshPanel.transformElementNamesOrdered.indexOf(event.target.id);
+        var defaultVal = event.target.id.indexOf('Scale') !== -1? 1: 0;
+        if (['', '-', '.', '-.'].indexOf(value) !== -1) {
+            meshPanel.transformValidatedNumbers[index] = defaultVal;
+        } else if (isNaN(value)) {
+            event.target.value = defaultVal;
+            meshPanel.transformValidatedNumbers[index] = defaultVal;
+        } else {
+            var dotIndex = value.indexOf('.');
+            var result;
+            if (dotIndex !== -1) {
+                // only allows 5 digits after decimal point: this will be serialized consistently
+                result = event.target.value = value.slice(0, dotIndex) + value.slice(dotIndex, dotIndex + 6);
+            } else {
+                result = event.target.value;
+            }
+            meshPanel.transformValidatedNumbers[index] = Number(result);
+        }
+        
+        var drawing = bitsy.drawing.getEngineObject();
+        b3d.meshConfig[drawing.drw].transform = b3d.transformFromArray(meshPanel.transformValidatedNumbers);
+
+        // force mesh instances to be recreated with the new transform by clearing the cache
+        b3d.clearCachesMesh(drawing.drw);
+
+        bitsy.refreshGameData();
     },
 
     onToggleChildren: function() {

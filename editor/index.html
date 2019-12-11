@@ -340,30 +340,30 @@
 							<input type="checkbox" id="meshTransparencyCheck" style="display:initial" onchange="meshPanel.onChangeTransparency();">
 						</div>
 
-						<input type="checkbox" id="meshTransformCheck" onclick="meshPanel.onToggleTransform();" />
-						<label title="offset, rotation and scale settings" for="meshTransformCheck">
+						<input type="checkbox" id="transformCheck" onclick="meshPanel.onToggleTransform();" />
+						<label title="translation (offset), rotation and scale settings" for="transformCheck">
 							<span>transform</span>
-							<i id="meshTransformCheckIcon" class="material-icons">expand_less</i>
+							<i id="transformCheckIcon" class="material-icons">expand_less</i>
 						</label>
 
-						<div id="meshTransform" style="display:none;">
-							<div id="meshOffset">
-								<i class="material-icons" title="offset" style="vertical-align:middle">swap_horiz</i>
-								<input type="text" id="meshOffsetX" title="offset on x axis" size="5" value="0">
-								<input type="text" id="meshOffsetY" title="offset on y axis" size="5" value="0">
-								<input type="text" id="meshOffsetZ" title="offset on z axis" size="5" value="0">
+						<div id="transform" style="display:none;">
+							<div id="transformTranslation">
+								<i class="material-icons" title="translation (offset)" style="vertical-align:middle">swap_horiz</i>
+								<input type="text" id="transformTranslationX" title="translation on x axis" size="7" value="0">
+								<input type="text" id="transformTranslationY" title="translation on y axis" size="7" value="0">
+								<input type="text" id="transformTranslationZ" title="translation on z axis" size="7" value="0">
 							</div>
-							<div id="meshRotation">
+							<div id="transformRotation">
 								<i class="material-icons" title="rotation" style="vertical-align:middle">rotate_right</i>
-								<input type="text" id="meshRotationX" title="rotation in degrees around x axis" size="5" value="0">
-								<input type="text" id="meshRotationY" title="rotation in degrees around y axis" size="5" value="0">
-								<input type="text" id="meshRotationZ" title="rotation in degrees around z axis" size="5" value="0">
+								<input type="text" id="transformRotationX" title="rotation in degrees around x axis" size="7" value="0">
+								<input type="text" id="transformRotationY" title="rotation in degrees around y axis" size="7" value="0">
+								<input type="text" id="transformRotationZ" title="rotation in degrees around z axis" size="7" value="0">
 							</div>
-							<div id="meshScale">
+							<div id="transformScale">
 								<i class="material-icons" title="scale" style="vertical-align:middle">zoom_out_map</i>
-								<input type="text" id="meshScaleX" title="scale on x axis" size="5" value="1">
-								<input type="text" id="meshScaleY" title="scale on y axis" size="5" value="1">
-								<input type="text" id="meshScaleZ" title="scale on z axis" size="5" value="1">
+								<input type="text" id="transformScaleX" title="scale on x axis" size="7" value="1">
+								<input type="text" id="transformScaleY" title="scale on y axis" size="7" value="1">
+								<input type="text" id="transformScaleZ" title="scale on z axis" size="7" value="1">
 							</div>
 						</div>
 					</div>
