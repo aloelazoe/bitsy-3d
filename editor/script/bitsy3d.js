@@ -106,7 +106,7 @@ b3d.parseDataFromDialog = function () {
         var config = b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
         config.type = parsedConfig.type || config.type;
         config.transparency = parsedConfig.hasOwnProperty('transparency') ? parsedConfig.transparency : config.transparency;
-        config.transform = parsedConfig.transform && b3d.parseTransform(parsedConfig.transform);
+        config.transform = parsedConfig.transform && b3d.transformFromArray(parsedConfig.transform.split(','));
         config.replacement = parsedConfig.replacement && b3d.getDrw(parsedConfig.replacement);
         config.children = parsedConfig.children && parsedConfig.children.map(b3d.getDrw);
     });
@@ -133,31 +133,27 @@ b3d.getDefaultMeshProps = function (drawing) {
     };
 };
 
-b3d.parseTransform = function (str) {
-    var arr = str.split(',');
-
-    var matrix = BABYLON.Matrix.Compose(
-            // scale
-            new BABYLON.Vector3(
-                Number(arr[0]) || 1,
-                Number(arr[1]) || 1,
-                Number(arr[2]) || 1
-            ),
-            // rotation
-            BABYLON.Quaternion.FromEulerAngles(
-                (Number(arr[3]) || 0) * Math.PI / 180,
-                (Number(arr[4]) || 0) * Math.PI / 180,
-                (Number(arr[5]) || 0) * Math.PI / 180
-            ),
-            // translation
-            new BABYLON.Vector3(
-                Number(arr[6]) || 0,
-                Number(arr[7]) || 0,
-                Number(arr[8]) || 0
-            ),
-        );
-
-    return matrix;
+b3d.transformFromArray = function (arr) {
+    return BABYLON.Matrix.Compose(
+        // scale
+        new BABYLON.Vector3(
+            Number(arr[0]) || 1,
+            Number(arr[1]) || 1,
+            Number(arr[2]) || 1
+        ),
+        // rotation
+        BABYLON.Quaternion.FromEulerAngles(
+            (Number(arr[3]) || 0) * Math.PI / 180,
+            (Number(arr[4]) || 0) * Math.PI / 180,
+            (Number(arr[5]) || 0) * Math.PI / 180
+        ),
+        // translation
+        new BABYLON.Vector3(
+            Number(arr[6]) || 0,
+            Number(arr[7]) || 0,
+            Number(arr[8]) || 0
+        ),
+    );
 };
 
 // helper function
@@ -234,27 +230,7 @@ b3d.serializeDataAsDialog = function () {
             configSerialized.type = config.type;
         }
         if (config.transform && !config.transform.isIdentity()) {
-            // serialize transform matrix as an array:
-            // [ scaleX, scaleY, scaleZ,
-            //   rotationX, rotationY, rotationZ,
-            //   translationX, translationY, translationZ ]
-            var scale = new BABYLON.Vector3();
-            var rotation = new BABYLON.Quaternion();
-            var translation = new BABYLON.Vector3();
-
-            config.transform.decompose(scale, rotation, translation);
-
-            configSerialized.transform = [].concat(
-                scale.asArray(),
-                rotation.toEulerAngles().asArray().map(function(n){return n * 180 / Math.PI}),
-                translation.asArray())
-                .map(function (n) {
-                    // adjust weird offsets that are apparently caused by float imprecision
-                    // it should be consistent with the editor input validation
-                    // that only allows 5 digits after the decimal point
-                    return Math.round(n * 100000) / 100000;
-                })
-                .toString();
+            configSerialized.transform = b3d.serializeTransform(config.transform).join(',');
         }
         if (config.transparency !== b3d.getDefaultTransparency(drawing)) {
             configSerialized.transparency = config.transparency;
@@ -282,6 +258,29 @@ b3d.serializeDataAsDialog = function () {
 }; // b3d.serializeDataAsDialog
 
 b3d.serializeData = b3d.serializeDataAsDialog;
+
+b3d.serializeTransform = function (transform) {
+    // serialize transform matrix as an array:
+    // [ scaleX, scaleY, scaleZ,
+    //   rotationX, rotationY, rotationZ,
+    //   translationX, translationY, translationZ ]
+    var scale = new BABYLON.Vector3();
+    var rotation = new BABYLON.Quaternion();
+    var translation = new BABYLON.Vector3();
+
+    transform.decompose(scale, rotation, translation);
+
+    return [].concat(
+        scale.asArray(),
+        rotation.toEulerAngles().asArray().map(function(n){return n * 180 / Math.PI}),
+        translation.asArray())
+        .map(function (n) {
+            // adjust weird offsets that are apparently caused by float imprecision
+            // it should be consistent with the editor input validation
+            // that only allows 5 digits after the decimal point
+            return Math.round(n * 100000) / 100000;
+        });
+};
 
 // returns the name of the drawing with it's mesh configuration serialized to name tags
 // or undefined if no serialization was needed
