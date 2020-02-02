@@ -736,6 +736,10 @@ var room3dPanel = {
 
 // set up and respond to ui elements in mesh panel
 var meshPanel = {
+    // drw of the drawing that the changes should be applied to
+    // can refer to base mesh or one of the children
+    curDrw: null,
+
     subTypePrefixes: ['tower'],
     typeSelectEl: null,
     subTypeSelectEl: null,
@@ -812,9 +816,13 @@ var meshPanel = {
         // make sure mesh config is shown
         document.getElementById('meshConfig').style.display = 'block';
 
-        // update mesh name
+        // update mesh config options to reflect the base mesh
+        meshPanel.curDrw = bitsy.drawing.getEngineObject().drw;
+        console.log('selected base mesh ' + meshPanel.curDrw);
 
-        // todo: update mesh config options to reflect the base mesh
+        meshPanel.updateType();
+        meshPanel.updateTransparency();
+        meshPanel.updateTransform();
     },
 
     onTabChildren: function() {
@@ -825,10 +833,8 @@ var meshPanel = {
         var drawing = bitsy.drawing.getEngineObject();
         if (b3d.meshConfig[drawing.drw].children && b3d.meshConfig[drawing.drw].children.length > 0) {
             // if this mesh has children
-            // update children list
+            // update children list and select the first child
             meshPanel.updateChildrenList();
-            // select the first child in the list
-            document.getElementById('meshChildrenList').firstChild.checked = true;
 
             document.getElementById('meshChildrenList').style.display = 'block';
 
@@ -883,6 +889,17 @@ var meshPanel = {
                 labelEl.htmlFor = inputId;
                 spanEl.innerHTML = meshPanel.getDrawingFullTitle(drawing);
             });
+
+            // select the first child in the list
+            var firstChildEl = childrenList.firstChild.firstChild;
+            firstChildEl.checked = true;
+            meshPanel.curDrw = firstChildEl.value;
+
+            console.log('selected child: ' + meshPanel.curDrw);
+
+            meshPanel.updateType();
+            meshPanel.updateTransparency();
+            meshPanel.updateTransform();
         }
     },
 
@@ -892,7 +909,12 @@ var meshPanel = {
         document.getElementById('meshAddChildButton').style.display = 'block';
         document.getElementById('meshConfig').style.display = 'block';
 
-        console.log('selected child: ' + event.target.value);
+        meshPanel.curDrw = event.target.value;
+        console.log('selected child: ' + meshPanel.curDrw);
+
+        meshPanel.updateType();
+        meshPanel.updateTransparency();
+        meshPanel.updateTransform();
     },
 
     deleteChild: function(event) {
@@ -927,7 +949,10 @@ var meshPanel = {
     },
 
     updateSelection: function () {
-        document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(bitsy.drawing.getEngineObject());
+        var drawing = bitsy.drawing.getEngineObject();
+        meshPanel.curDrw = drawing.drw;
+        console.log('selected base mesh ' + meshPanel.curDrw);
+        document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(drawing);
         meshPanel.onTabBase();
         meshPanel.updateType();
         meshPanel.updateTransparency();
@@ -935,8 +960,7 @@ var meshPanel = {
     },
 
     updateType: function () {
-        var drawing = bitsy.drawing.getEngineObject();
-        var type = b3d.meshConfig[drawing.drw].type;
+        var type = b3d.meshConfig[meshPanel.curDrw].type;
         var prefix = meshPanel.subTypePrefixes.find(function (a) {return type.indexOf(a) !== -1});
         if (prefix) {
             var suffix = type.slice(prefix.length);
@@ -961,21 +985,18 @@ var meshPanel = {
             }
         });
 
-        var drawing = bitsy.drawing.getEngineObject();
-        b3d.meshConfig[drawing.drw].type = curMeshType;
-        b3d.clearCachesMesh(drawing.drw);
+        b3d.meshConfig[meshPanel.curDrw].type = curMeshType;
+        b3d.clearCachesMesh(meshPanel.curDrw);
         bitsy.refreshGameData();
     },
 
     updateTransparency: function() {
-        var drawing = bitsy.drawing.getEngineObject();
-        meshPanel.transparencyCheckEl.checked = b3d.meshConfig[drawing.drw].transparency;
+        meshPanel.transparencyCheckEl.checked = b3d.meshConfig[meshPanel.curDrw].transparency;
     },
 
     onChangeTransparency: function() {
-        var drawing = bitsy.drawing.getEngineObject();
-        b3d.meshConfig[drawing.drw].transparency = meshPanel.transparencyCheckEl.checked;
-        b3d.clearCachesTexture(drawing.drw);
+        b3d.meshConfig[meshPanel.curDrw].transparency = meshPanel.transparencyCheckEl.checked;
+        b3d.clearCachesTexture(meshPanel.curDrw);
         b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
         // b3d.clearCaches(Object.values(b3d.caches));
         bitsy.refreshGameData();
@@ -992,8 +1013,7 @@ var meshPanel = {
     },
 
     updateTransform: function (argument) {
-        var drawing = bitsy.drawing.getEngineObject();
-        var transform = b3d.meshConfig[drawing.drw].transform;
+        var transform = b3d.meshConfig[meshPanel.curDrw].transform;
         if (transform) {
             meshPanel.transformValidatedNumbers = b3d.serializeTransform(transform);
         } else {
@@ -1033,11 +1053,10 @@ var meshPanel = {
             meshPanel.transformValidatedNumbers[index] = Number(result);
         }
         
-        var drawing = bitsy.drawing.getEngineObject();
-        b3d.meshConfig[drawing.drw].transform = b3d.transformFromArray(meshPanel.transformValidatedNumbers);
+        b3d.meshConfig[meshPanel.curDrw].transform = b3d.transformFromArray(meshPanel.transformValidatedNumbers);
 
         // force mesh instances to be recreated with the new transform by clearing the cache
-        b3d.clearCachesMesh(drawing.drw);
+        b3d.clearCachesMesh(meshPanel.curDrw);
 
         bitsy.refreshGameData();
     },
