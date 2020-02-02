@@ -799,7 +799,136 @@ var meshPanel = {
         meshPanel.onToggleTransform();
     },
 
+    // todo: actually display data about and edit appropriate child meshes
+    // when they are selected, instead of the base mesh
+
+    onTabBase: function() {
+        // make sure the right tab is always checked
+        document.getElementById('meshTabBase').checked = true;
+
+        document.getElementById('meshChildrenList').style.display = 'none';
+        document.getElementById('meshAddChildArea').style.display = 'none';
+
+        // make sure mesh config is shown
+        document.getElementById('meshConfig').style.display = 'block';
+
+        // update mesh name
+
+        // todo: update mesh config options to reflect the base mesh
+    },
+
+    onTabChildren: function() {
+        // make sure the right tab is always checked
+        document.getElementById('meshTabChildren').checked = true;
+
+        // display different things depending on whether there are any children in the list
+        var drawing = bitsy.drawing.getEngineObject();
+        if (b3d.meshConfig[drawing.drw].children && b3d.meshConfig[drawing.drw].children.length > 0) {
+            // if this mesh has children
+            // update children list
+            meshPanel.updateChildrenList();
+            // select the first child in the list
+            document.getElementById('meshChildrenList').firstChild.checked = true;
+
+            document.getElementById('meshChildrenList').style.display = 'block';
+
+            // todo: select the first child option in the list
+            // document.getElementById('meshChildrenList')
+
+            // display add child button
+            document.getElementById('meshAddChildButton').style.display = 'block';
+            document.getElementById('meshAddChildArea').style.display = 'none';
+
+            // display mesh config
+            document.getElementById('meshConfig').style.display = 'block';
+
+            // todo: update mesh config options according to selected child mesh
+        } else {
+            // if it doesn't have children, hide mesh config and only display add child area
+            document.getElementById('meshChildrenList').style.display = 'none';
+            document.getElementById('meshConfig').style.display = 'none';
+            document.getElementById('meshAddChildArea').style.display = 'block';
+        }
+    },
+
+    updateChildrenList: function() {
+        // remove old elements
+        var childrenList = document.getElementById('meshChildrenList');
+        while (true) {
+            var curEl = childrenList.firstChild;
+            if (curEl.id === 'meshAddChildButton') {
+                break;
+            } else {
+                curEl.parentNode.removeChild(curEl);
+            }
+        }
+        // make new elements
+        var children = b3d.meshConfig[bitsy.drawing.getEngineObject().drw].children;
+        if (children && children.length > 0) {
+            children.forEach(function(drawing) {
+                console.log(drawing);
+
+                var divEl = document.createElement('div');
+                var inputEl = document.createElement('input');
+                var labelEl = document.createElement('label');
+                var spanEl = document.createElement('span');
+
+                childrenList.insertBefore(divEl, document.getElementById('meshAddChildButton'));
+                divEl.appendChild(inputEl);
+                divEl.appendChild(labelEl);
+                labelEl.appendChild(spanEl);
+
+                var inputId = 'childMesh' + drawing.drw;
+                Object.assign(inputEl, {type: 'radio', name: 'children list', value: drawing.drw, id: inputId, onclick: meshPanel.selectChild, checked: true});
+                labelEl.htmlFor = inputId;
+                spanEl.innerHTML = meshPanel.getDrawingFullTitle(drawing);
+            });
+        }
+    },
+
+    selectChild: function(event) {
+        // hide add child area and display a button
+        document.getElementById('meshAddChildArea').style.display = 'none';
+        document.getElementById('meshAddChildButton').style.display = 'block';
+        document.getElementById('meshConfig').style.display = 'block';
+
+        console.log('selected child: ' + event.target.value);
+    },
+
+    deleteChild: function(event) {
+        // console.log('deleted child: ' + event.target.value);
+    },
+
+    onAddChildButton: function(event) {
+        // console.log('deleted child: ' + event.target.value);
+        document.getElementById('meshConfig').style.display = 'none';
+        document.getElementById('meshAddChildArea').style.display = 'block';
+        document.getElementById('meshAddChildButton').style.display = 'none';
+    },
+
+    getDrawingFullTitle: function(drawing) {
+        var title = '';
+        switch (drawing.drw.slice(0,3)) {
+            case 'SPR':
+                title = 'sprite';
+                break;
+            case 'TIL':
+                title = 'tile';
+                break;
+            case 'ITM':
+                title = 'item';
+                break;
+        }
+        title = title + ' ' + drawing.id;
+        if (drawing.name) {
+            title = title + ': ' + drawing.name;
+        }
+        return title;
+    },
+
     updateSelection: function () {
+        document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(bitsy.drawing.getEngineObject());
+        meshPanel.onTabBase();
         meshPanel.updateType();
         meshPanel.updateTransparency();
         meshPanel.updateTransform();
@@ -913,13 +1042,4 @@ var meshPanel = {
         bitsy.refreshGameData();
     },
 
-    onToggleChildren: function() {
-        if ( document.getElementById('meshChildrenCheck').checked ) {
-            document.getElementById('meshChildren').setAttribute('style','display:block;');
-            document.getElementById('meshChildrenCheckIcon').innerHTML = 'expand_more';
-        } else {
-            document.getElementById('meshChildren').setAttribute('style','display:none;');
-            document.getElementById('meshChildrenCheckIcon').innerHTML = 'expand_less';
-        }
-    },
 }; // meshPanel
