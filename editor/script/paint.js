@@ -188,7 +188,9 @@ function PaintTool(canvas, roomTool) {
 			refreshGameData();
 			roomTool.drawEditMap(); // TODO : events instead of direct coupling
 
-			if(self.explorer != null) {
+			// 3d editor fix: only attempt to render a thumbnail if the same drawing type is
+			// selected in both paint tool and exporer
+			if(self.explorer != null && paintExplorerGetCurType() === self.drawing.type) {
 				self.explorer.RenderThumbnail( self.drawing.id );
 			}
 			if( self.isCurDrawingAnimated ) {

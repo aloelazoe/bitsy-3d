@@ -864,6 +864,8 @@ function start() {
 }
 
 function newDrawing() {
+	// 3d editor fix: make sure the right type is selected
+	paintExplorerResetTabToType(paintExplorerGetCurType());
 	paintTool.newDrawing();
 }
 
@@ -1010,7 +1012,11 @@ function selectRoom(roomId) {
 		roomTool.drawEditMap();
 		paintTool.updateCanvas();
 		updateRoomPaletteSelect();
-		paintExplorer.Refresh( paintTool.drawing.type, true /*doKeepOldThumbnails*/ );
+
+		// 3d editor fix: refresh paint explorer according to its own drawing type
+		// which can be different from the paint tool to allow for convenient drag & drop
+		// this fixes the bug when drawing thumbnails aren't loaded properly
+		paintExplorer.Refresh( paintExplorerGetCurType(), true /*doKeepOldThumbnails*/ );
 
 		if (drawing.type === TileType.Tile) {
 			updateWallCheckboxOnCurrentTile();
@@ -1884,7 +1890,48 @@ function renderAnimationPreview(id) {
 	renderAnimationThumbnail( "animationThumbnailFrame2", id, 1 );
 }
 
+// 3d editor addition:
+// set drawing type according to what tab is selected in paint explorer to prevent bugs
+function paintExplorerGetCurType() {
+	var t = null;
+	[
+        'paintExplorerOptionAvatar',
+        'paintExplorerOptionTile',
+        'paintExplorerOptionSprite',
+        'paintExplorerOptionItem'
+    ].forEach(function(elId) {
+        var el = document.getElementById(elId);
+        if (el.checked) {
+            t = TileType[el.value.charAt(0).toUpperCase() + el.value.slice(1)];
+        }
+    });
+	return t;
+}
+
+function paintExplorerResetTabToType(type) {
+	switch (type) {
+    	case TileType.Avatar:
+    		on_paint_avatar();
+    		break;
+    	case TileType.Tile:
+    		on_paint_tile();
+    		break;
+		case TileType.Sprite:
+			on_paint_sprite();
+			break;
+		case TileType.Item:
+			on_paint_item();
+			break;
+    };
+}
+
 function selectPaint() {
+	// 3d editor addition:
+	// set drawing type according to what tab is selected in paint explorer to prevent bugs
+    drawing.type = paintExplorerGetCurType();
+    paintExplorerResetTabToType(drawing.type);
+	paintExplorer.ChangeSelection( this.value );
+
 	if(drawing.id === this.value && document.getElementById("paintPanel").style.display === "none") {
 		togglePanelCore("paintPanel", true /*visible*/); // animate?
 	}

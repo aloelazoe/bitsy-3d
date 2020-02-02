@@ -230,6 +230,46 @@ editor3d.init = function() {
             delete editor3d._patchContext.deletedDrawingId;
         }
     );
+
+    // change the behavior of 'find drawing' panel to allow viewing drawings
+    // of different types without automatically selecting a drawing of that type
+    // this should be accompanied by the fix to 'selectPaint' function,
+    // which doesn't work as a patch for some reason, so i had to modify bitsy source
+    // also needed to make thumbnails draggable in 'explorer.js'
+    // and fix a few other new bugs in 'paint.js' and 'editor.js'
+    
+    // replace 'find drawing' tab buttons callbacks so that they don't
+    // automatically select a new drawing
+    // this way 'find drawing' panel can be more useful for drag & drop
+    document.getElementById('paintExplorerOptionAvatar').onclick = function() {
+        if(bitsy.paintExplorer != null) { 
+            bitsy.paintExplorer.Refresh(bitsy.TileType.Avatar);
+        }
+        document.getElementById("paintExplorerOptionAvatar").checked = true;
+        document.getElementById("paintExplorerAdd").setAttribute("style","display:none;");
+        document.getElementById("paintExplorerFilterInput").value = "";
+    };
+
+    document.getElementById('paintExplorerOptionTile').onclick = function() {
+        bitsy.paintExplorer.Refresh(bitsy.TileType.Tile);
+        document.getElementById("paintExplorerOptionTile").checked = true;
+        document.getElementById("paintExplorerAdd").setAttribute("style","display:inline-block;");
+        document.getElementById("paintExplorerFilterInput").value = "";
+    };
+
+    document.getElementById('paintExplorerOptionSprite').onclick = function() {
+        bitsy.paintExplorer.Refresh(bitsy.TileType.Sprite);
+        document.getElementById("paintExplorerOptionSprite").checked = true;
+        document.getElementById("paintExplorerAdd").setAttribute("style","display:inline-block;");
+        document.getElementById("paintExplorerFilterInput").value = "";
+    };
+
+    document.getElementById('paintExplorerOptionItem').onclick = function() {
+        bitsy.paintExplorer.Refresh(bitsy.TileType.Item);
+        document.getElementById("paintExplorerOptionItem").checked = true;
+        document.getElementById("paintExplorerAdd").setAttribute("style","display:inline-block;");
+        document.getElementById("paintExplorerFilterInput").value = "";
+    };
     
 }; // editor3d.init()
 
@@ -803,9 +843,6 @@ var meshPanel = {
         meshPanel.onToggleTransform();
     },
 
-    // todo: actually display data about and edit appropriate child meshes
-    // when they are selected, instead of the base mesh
-
     onTabBase: function() {
         // make sure the right tab is always checked
         document.getElementById('meshTabBase').checked = true;
@@ -1061,4 +1098,15 @@ var meshPanel = {
         bitsy.refreshGameData();
     },
 
+    addChildDropHandler: function (event) {
+        event.preventDefault();
+        const data = event.dataTransfer.getData("text/plain");
+        console.log('dropped a child: ' + data);
+    },
+
+    addChildDragoverHandler: function (event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "link";
+        console.log('addChildDragoverHandler');
+    },
 }; // meshPanel

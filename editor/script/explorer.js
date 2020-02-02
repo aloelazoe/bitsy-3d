@@ -204,6 +204,14 @@ function PaintExplorer(idPrefix,selectCallback) {
 		radio.onclick = selectCallback;
 
 		updateThumbnail( id );
+
+		// 3d editor addition: make thumbnails draggable
+		img.draggable = true;
+		img.ondragstart = function(event) {
+			// store the 'drw' of this thumbnail
+			event.dataTransfer.dropEffect = "link";
+			event.dataTransfer.setData("text/plain", event.target.id.match(/(?:ITM|SPR|TIL).*/)[0]);
+		};
 	}
 	this.AddThumbnail = function(id) {
 		addThumbnail(id);
