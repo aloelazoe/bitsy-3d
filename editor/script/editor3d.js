@@ -665,6 +665,22 @@ editor3d.getNormal = function (mesh, faceId) {
     return normal;
 }; // editor3d.getNormal()
 
+editor3d.getDrawingFromDrw = function (drw) {
+    var type;
+    switch (drw.slice(0,3)) {
+        case 'SPR':
+            type = 'sprite';
+            break;
+        case 'TIL':
+            type = 'tile';
+            break;
+        case 'ITM':
+            type = 'item';
+            break;
+    }
+    return bitsy[type][drw.slice(4)];
+};
+
 editor3d.update = function () {
     b3d.update();
 
@@ -843,6 +859,13 @@ var meshPanel = {
         meshPanel.onToggleTransform();
     },
 
+    // update widgets. they will reflect meshPanel.curDrw
+    updateMeshConfigWidgets: function() {
+        meshPanel.updateType();
+        meshPanel.updateTransparency();
+        meshPanel.updateTransform();
+    },
+
     onTabBase: function() {
         // make sure the right tab is always checked
         document.getElementById('meshTabBase').checked = true;
@@ -857,9 +880,7 @@ var meshPanel = {
         meshPanel.curDrw = bitsy.drawing.getEngineObject().drw;
         console.log('selected base mesh ' + meshPanel.curDrw);
 
-        meshPanel.updateType();
-        meshPanel.updateTransparency();
-        meshPanel.updateTransform();
+        meshPanel.updateMeshConfigWidgets();
     },
 
     onTabChildren: function() {
@@ -870,13 +891,7 @@ var meshPanel = {
         var drawing = bitsy.drawing.getEngineObject();
         if (b3d.meshConfig[drawing.drw].children && b3d.meshConfig[drawing.drw].children.length > 0) {
             // if this mesh has children
-            // update children list and select the first child
-            meshPanel.updateChildrenList();
-
             document.getElementById('meshChildrenList').style.display = 'block';
-
-            // todo: select the first child option in the list
-            // document.getElementById('meshChildrenList')
 
             // display add child button
             document.getElementById('meshAddChildButton').style.display = 'block';
@@ -908,36 +923,34 @@ var meshPanel = {
         // make new elements
         var children = b3d.meshConfig[bitsy.drawing.getEngineObject().drw].children;
         if (children && children.length > 0) {
-            children.forEach(function(drawing) {
-                console.log(drawing);
-
-                var divEl = document.createElement('div');
-                var inputEl = document.createElement('input');
-                var labelEl = document.createElement('label');
-                var spanEl = document.createElement('span');
-
-                childrenList.insertBefore(divEl, document.getElementById('meshAddChildButton'));
-                divEl.appendChild(inputEl);
-                divEl.appendChild(labelEl);
-                labelEl.appendChild(spanEl);
-
-                var inputId = 'childMesh' + drawing.drw;
-                Object.assign(inputEl, {type: 'radio', name: 'children list', value: drawing.drw, id: inputId, onclick: meshPanel.selectChild, checked: true});
-                labelEl.htmlFor = inputId;
-                spanEl.innerHTML = meshPanel.getDrawingFullTitle(drawing);
-            });
-
-            // select the first child in the list
-            var firstChildEl = childrenList.firstChild.firstChild;
-            firstChildEl.checked = true;
-            meshPanel.curDrw = firstChildEl.value;
-
-            console.log('selected child: ' + meshPanel.curDrw);
-
-            meshPanel.updateType();
-            meshPanel.updateTransparency();
-            meshPanel.updateTransform();
+            children.forEach(meshPanel.addSelectChildEl);
+            meshPanel.updateMeshConfigWidgets();
         }
+    },
+
+    addSelectChildEl: function(drawing) {
+        // add new child element. it will be checked by default
+        // and selected as current drawing for editing mesh configuration
+        var childrenList = document.getElementById('meshChildrenList');
+        
+        var divEl = document.createElement('div');
+        var inputEl = document.createElement('input');
+        var labelEl = document.createElement('label');
+        var spanEl = document.createElement('span');
+
+        childrenList.insertBefore(divEl, document.getElementById('meshAddChildButton'));
+        divEl.appendChild(inputEl);
+        divEl.appendChild(labelEl);
+        labelEl.appendChild(spanEl);
+
+        var inputId = 'childMesh' + drawing.drw;        
+        labelEl.htmlFor = inputId;
+        spanEl.innerHTML = meshPanel.getDrawingFullTitle(drawing);
+        
+        // set up radio button element and mark it as checked
+        Object.assign(inputEl, {type: 'radio', name: 'children list', value: drawing.drw, id: inputId, onclick: meshPanel.selectChild, checked: true});
+        // select drawing as current
+        meshPanel.curDrw = drawing.drw;
     },
 
     selectChild: function(event) {
@@ -946,23 +959,40 @@ var meshPanel = {
         document.getElementById('meshAddChildButton').style.display = 'block';
         document.getElementById('meshConfig').style.display = 'block';
 
+        // the child radio button will be marked as checked by the click
+        // also select the respective drawing as current
         meshPanel.curDrw = event.target.value;
         console.log('selected child: ' + meshPanel.curDrw);
 
-        meshPanel.updateType();
-        meshPanel.updateTransparency();
-        meshPanel.updateTransform();
+        meshPanel.updateMeshConfigWidgets();
     },
 
-    deleteChild: function(event) {
-        // console.log('deleted child: ' + event.target.value);
-    },
-
+    // when pressing a plus sign button that expands into a drag & drop area
     onAddChildButton: function(event) {
         // console.log('deleted child: ' + event.target.value);
         document.getElementById('meshConfig').style.display = 'none';
         document.getElementById('meshAddChildArea').style.display = 'block';
         document.getElementById('meshAddChildButton').style.display = 'none';
+    },
+
+    addChild: function(drw) {
+        var baseDrawing = bitsy.drawing.getEngineObject();
+        var childDrawing = editor3d.getDrawingFromDrw(drw);
+        // add child to 3d data
+        b3d.meshConfig[baseDrawing.drw].children = b3d.meshConfig[baseDrawing.drw].children || [];
+        b3d.meshConfig[baseDrawing.drw].children.push(childDrawing);
+        // add child to ui and select both its ui element as and its data as a current editing target
+        meshPanel.addSelectChildEl(childDrawing);
+        meshPanel.updateMeshConfigWidgets();
+        // update 3d scene
+        b3d.clearCachesMesh(baseDrawing.drw);
+        // update serialized data
+        bitsy.refreshGameData();
+    },
+
+    deleteChild: function(event) {
+        // delete child from 3d data
+        // delete ui element
     },
 
     getDrawingFullTitle: function(drawing) {
@@ -985,15 +1015,15 @@ var meshPanel = {
         return title;
     },
 
+    // to be called when another drawing is selected
     updateSelection: function () {
         var drawing = bitsy.drawing.getEngineObject();
         meshPanel.curDrw = drawing.drw;
         console.log('selected base mesh ' + meshPanel.curDrw);
         document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(drawing);
         meshPanel.onTabBase();
-        meshPanel.updateType();
-        meshPanel.updateTransparency();
-        meshPanel.updateTransform();
+        meshPanel.updateChildrenList();
+        meshPanel.updateMeshConfigWidgets();
     },
 
     updateType: function () {
@@ -1102,6 +1132,13 @@ var meshPanel = {
         event.preventDefault();
         const data = event.dataTransfer.getData("text/plain");
         console.log('dropped a child: ' + data);
+
+        document.getElementById('meshAddChildArea').style.display = 'none';
+        document.getElementById('meshChildrenList').style.display = 'block';
+        document.getElementById('meshAddChildButton').style.display = 'block';
+        document.getElementById('meshConfig').style.display = 'block';
+
+        meshPanel.addChild(data);
     },
 
     addChildDragoverHandler: function (event) {
