@@ -887,6 +887,8 @@ var meshPanel = {
         // make sure the right tab is always checked
         document.getElementById('meshTabChildren').checked = true;
 
+        meshPanel.updateChildrenList();
+
         // display different things depending on whether there are any children in the list
         var drawing = bitsy.drawing.getEngineObject();
         if (b3d.meshConfig[drawing.drw].children && b3d.meshConfig[drawing.drw].children.length > 0) {
@@ -899,8 +901,6 @@ var meshPanel = {
 
             // display mesh config
             document.getElementById('meshConfig').style.display = 'block';
-
-            // todo: update mesh config options according to selected child mesh
         } else {
             // if it doesn't have children, hide mesh config and only display add child area
             document.getElementById('meshChildrenList').style.display = 'none';
@@ -909,6 +909,7 @@ var meshPanel = {
         }
     },
 
+    // removes old elements, creates new child elements and selects the last child element
     updateChildrenList: function() {
         // remove old elements
         var childrenList = document.getElementById('meshChildrenList');
@@ -951,6 +952,14 @@ var meshPanel = {
         Object.assign(inputEl, {type: 'radio', name: 'children list', value: drawing.drw, id: inputId, onclick: meshPanel.selectChild, checked: true});
         // select drawing as current
         meshPanel.curDrw = drawing.drw;
+
+        // make delete button
+        var deleteButton = document.createElement('button');
+        deleteButton.setAttribute('class', 'color0');
+        deleteButton.setAttribute('style', 'margin-top: 2px; margin-left: 2px;');
+        Object.assign(deleteButton, {value: drawing.drw, title: 'delete child mesh', onclick: meshPanel.deleteChild});
+        deleteButton.innerHTML = '<i class="material-icons">remove_circle</i>';
+        divEl.appendChild(deleteButton);
     },
 
     selectChild: function(event) {
@@ -991,8 +1000,24 @@ var meshPanel = {
     },
 
     deleteChild: function(event) {
+        event.preventDefault();
+
         // delete child from 3d data
-        // delete ui element
+        var baseDrw = bitsy.drawing.getEngineObject().drw;
+        // 'this' will be set to delete button element
+        var childDrw = this.value;
+        b3d.meshConfig[baseDrw].children = b3d.meshConfig[baseDrw].children.filter(function(childDrawing) {
+            return childDrawing.drw !== childDrw;
+        });
+        
+        // update 3d scene
+        b3d.clearCachesMesh(childDrw);
+        b3d.clearCachesMesh(baseDrw);
+        // update serialized data
+        bitsy.refreshGameData();
+        // update ui
+        meshPanel.updateChildrenList();
+        meshPanel.onTabChildren();
     },
 
     getDrawingFullTitle: function(drawing) {
@@ -1022,7 +1047,6 @@ var meshPanel = {
         console.log('selected base mesh ' + meshPanel.curDrw);
         document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(drawing);
         meshPanel.onTabBase();
-        meshPanel.updateChildrenList();
         meshPanel.updateMeshConfigWidgets();
     },
 
