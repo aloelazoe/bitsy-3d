@@ -26,6 +26,8 @@ var b3d = {
 
     caches: {},
 
+    playerRef: null,
+
     // when set to true, drawing replacements won't be applied,
     // and drawings set to have empty meshes will have their default visible meshes instead
     debugView: false,
@@ -920,5 +922,8 @@ b3d.meshExtraSetup = function (drawing, mesh) {
         mesh.billboardMode = b3d.getBillboardMode();
     } else if (!drawing.drw.startsWith('SPR')) {
         mesh.freezeWorldMatrix();
+    }
+    if (drawing === bitsy.player()) {
+        b3d.playerRef = mesh;
     }
 };
