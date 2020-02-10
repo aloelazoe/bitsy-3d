@@ -23,6 +23,12 @@ var resourceFiles = [
 	"../editor/script/engine/color_util.js",
 	"../editor/script/engine/renderer.js",
 	"../editor/script/engine/transition.js",
+	/* 3d hack and dependencies*/
+	"../editor/libs/babylon.js",
+	"../editor/script/3d/b3d-core.js",
+	"../editor/script/3d/export/kitsy.js",
+	"../editor/script/3d/export/smooth-moves.js",
+	"../editor/script/3d/export/b3d-game.js",
 ];
 
 var resourcePackage = {};
