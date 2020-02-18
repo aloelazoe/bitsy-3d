@@ -13,6 +13,8 @@ var editor3d = {
         Gray: new BABYLON.Color3(1, 1, 1),
     },
 
+    canvas: null,
+
     // debug. set this when clicking on the mesh in select mode
     curSelectedMesh: null,
 
@@ -20,6 +22,8 @@ var editor3d = {
 
     // track what drawing is selected
     lastSelectedDrawing: null,
+
+    takeScreenshot: false,
 };
 
 editor3d.cursor = {
@@ -39,13 +43,13 @@ editor3d.cursor = {
 };
 
 editor3d.init = function() {
-    var canvas = document.getElementById('room3dCanvas');
-    console.log('canvas');
-    console.log(canvas);
-    canvas.width = 512;
-    canvas.height = 512;
+    editor3d.canvas = document.getElementById('room3dCanvas');
 
-    b3d.init(canvas);
+    b3d.size.width = 512;
+    b3d.size.height = 512;
+
+    b3d.init(editor3d.canvas);
+
     editor3d.suggestReplacingNameTags();
 
     // make a mesh for 3d cursor
@@ -85,18 +89,18 @@ editor3d.init = function() {
     camera.upperHeightOffsetLimit = bitsy.mapsize / 2;
     camera.upperBetaLimit = Math.PI / 2;
 
-    camera.attachControl(canvas);
+    camera.attachControl(editor3d.canvas);
 
     // set the rendering loop function
     b3d.engine.runRenderLoop(editor3d.update);
 
     // add event listeners
-    canvas.addEventListener('mouseover', function (e) {
+    editor3d.canvas.addEventListener('mouseover', function (e) {
         // register 3d cursor update & mouse picking
         editor3d.cursor.shouldUpdate = true;
     });
 
-    canvas.addEventListener('mouseleave', function (e) {
+    editor3d.canvas.addEventListener('mouseleave', function (e) {
         // unregister 3d cursor update & mouse picking
         editor3d.cursor.shouldUpdate = false;
     });
@@ -698,6 +702,18 @@ editor3d.update = function () {
     }
 
     b3d.scene.render();
+    // screenshots
+    if (editor3d.takeScreenshot) {
+        var link = document.createElement("a");
+        link.download = bitsy.title + '.png';
+        link.href = editor3d.canvas.toDataURL();
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        delete link;
+
+        editor3d.takeScreenshot = false;
+    }
 
     // check for changes in the environment and update ui
     if (editor3d.lastSelectedDrawing !== bitsy.drawing.getEngineObject()) {
