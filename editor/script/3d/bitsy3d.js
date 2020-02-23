@@ -1097,3 +1097,29 @@ b3d.meshExtraSetup = function (drawing, mesh) {
         b3d.avatarRef = mesh;
     }
 };
+
+b3d.cameraStateSnapshot = {
+    propertyList: ['alpha', 'beta', 'radius', 'fov', 'target'],
+    take: function () {
+        var obj = {};
+        this.propertyList.forEach(function (p) {
+            obj[p] = b3d.scene.activeCamera[p];
+        });
+        return JSON.stringify(obj);
+    },
+    apply: function (snapshot) {
+        var obj = JSON.parse(snapshot);
+        this._deepCopyObjectState(b3d.scene.activeCamera, obj);
+    },
+    _deepCopyObjectState: function (target, source) {
+        Object.keys(source).forEach(function (p) {
+            if (target[p] === null || target[p] === undefined) {
+                return;
+            } else if (typeof target[p] === 'object') {
+                this._deepCopyObjectState(target[p], source[p]);
+            } else {
+                target[p] = source[p];
+            }
+        }, this);
+    },
+};
