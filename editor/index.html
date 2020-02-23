@@ -18,9 +18,6 @@
 		<!-- GENERATED -->
 		<script src="script/generated/resources.js"></script>
 
-		<!-- 3D EDITOR DEPENDENCIES -->
-		<script src="libs/babylon.js"></script>
-
 		<!-- ENGINE SCRIPTS -->
 		<script src="script/engine/color_util.js"></script>
 		<script src="script/engine/font.js"></script>
@@ -29,11 +26,6 @@
 		<script src="script/engine/dialog.js"></script>
 		<script src="script/engine/renderer.js"></script>
 		<script src="script/engine/bitsy.js"></script>
-
-		<!-- 3D EDITOR -->
-		<script src="script/3d/b3d-core.js"></script>
-		<script src="script/3d/editor3d.js"></script>
-		<script src="script/3d/long-names.js"></script>
 
 		<!-- EDITOR SCRIPTS -->
 		<script src="script/util.js"></script>
@@ -50,6 +42,14 @@
 		<script src="script/editor.js"></script>
 		<script src="script/dialog_editor.js"></script>
 		<script src="script/inventory.js"></script>
+	
+		<!-- 3D EDITOR DEPENDENCIES -->
+		<script src="libs/babylon.js"></script>
+
+		<!-- 3D EDITOR -->
+		<script src="script/3d/bitsy3d.js"></script>
+		<script src="script/3d/editor3d.js"></script>
+		<script src="script/3d/long-names.js"></script>
 
 		<!-- FONTS -->
 		<link href="style/googleNunito.css" rel="stylesheet">
@@ -111,7 +111,7 @@
 				<input type="checkbox" value="room3dPanel" id="room3dCheck" onclick="togglePanelAnimated(event);" checked/>
 				<label title="show / hide 3d editor window" for="room3dCheck">
 					<i class="material-icons">grid_on</i>
-					<span>3d editor</span>
+					<span>3d scene</span>
 				</label>
 
 				<input type="checkbox" value="exitsPanel" id="exitsCheck" onclick="togglePanelAnimated(event);" />
@@ -123,7 +123,7 @@
 				<input type="checkbox" value="meshPanel" id="meshCheck" onclick="togglePanelAnimated(event);"  checked/>
 				<label title="show / hide mesh window" for="meshCheck">
 					<i class="material-icons">brush</i>
-					<span>mesh</span>
+					<span>3d settings</span>
 				</label>
 
 				<input type="checkbox" value="paintPanel" id="paintCheck" onclick="togglePanelAnimated(event);"  checked/>
@@ -288,11 +288,22 @@
 
 						<div title="3d editor window" class="panelBarTitle" onmousedown="grabCard(event);">
 							<i class="material-icons">grid_on</i>
-							<span>3d editor</span>
+							<span>3d scene</span>
 						</div>
 					</div>
 
-					<canvas id="room3dCanvas"></canvas>
+					<div style="margin-bottom:2px;">			
+						<input type="checkbox" id="playModeCheck3d" onclick="togglePlayMode(event);" />
+						<label title="play / pause game" for="playModeCheck3d">
+							<i class="material-icons" id="playModeIcon">play_arrow</i>
+							<span id="playModeText" class="localize play_game">play</span> <!-- TODO LOCALIZE: also stop_game -->
+						</label>
+					</div>
+
+					<div id="gameContainer" style="position: relative;">
+						<canvas id="sceneCanvas"></canvas>
+						<canvas id="textCanvas" style="position: absolute; left: 0%; background: none; pointer-events: none;"></canvas>
+					</div>
 
 					<div id="room3dStackControls" class="controlBox">
 						<button title="previous stack" class="color0" onclick="room3dPanel.selectAdjacent(-1);">
@@ -325,7 +336,7 @@
 
 						<div title="mesh window" class="panelBarTitle" onmousedown="grabCard(event);">
 							<i class="material-icons">brush</i>
-							<span>mesh</span>
+							<span>3d settings</span>
 						</div>
 					</div>
 

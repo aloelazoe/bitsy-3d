@@ -13,8 +13,6 @@ var editor3d = {
         Gray: new BABYLON.Color3(1, 1, 1),
     },
 
-    canvas: null,
-
     // debug. set this when clicking on the mesh in select mode
     curSelectedMesh: null,
 
@@ -43,12 +41,9 @@ editor3d.cursor = {
 };
 
 editor3d.init = function() {
-    editor3d.canvas = document.getElementById('room3dCanvas');
-
     b3d.size.width = 512;
     b3d.size.height = 512;
-
-    b3d.init(editor3d.canvas);
+    b3d.init();
 
     editor3d.suggestReplacingNameTags();
 
@@ -73,34 +68,16 @@ editor3d.init = function() {
     groundMat.alpha = 0;
     editor3d.groundMesh.material = groundMat;
 
-    // set up camera
-    // todo: make a proper camera
-    var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 2, 15, new BABYLON.Vector3(8,0,8), b3d.scene);
-    // perspective clipping
-    camera.position = new BABYLON.Vector3(7.5,10,-16);
-    camera.minZ = 0.001;
-    camera.maxZ = bitsy.mapsize * 5;
-    // zoom
-    camera.wheelPrecision = bitsy.mapsize;
-    camera.upperRadiusLimit = 30;
-    camera.lowerRadiusLimit = 1;
-
-    camera.lowerHeightOffsetLimit = 0;
-    camera.upperHeightOffsetLimit = bitsy.mapsize / 2;
-    camera.upperBetaLimit = Math.PI / 2;
-
-    camera.attachControl(editor3d.canvas);
-
     // set the rendering loop function
     b3d.engine.runRenderLoop(editor3d.update);
 
     // add event listeners
-    editor3d.canvas.addEventListener('mouseover', function (e) {
+    b3d.sceneCanvas.addEventListener('mouseover', function (e) {
         // register 3d cursor update & mouse picking
         editor3d.cursor.shouldUpdate = true;
     });
 
-    editor3d.canvas.addEventListener('mouseleave', function (e) {
+    b3d.sceneCanvas.addEventListener('mouseleave', function (e) {
         // unregister 3d cursor update & mouse picking
         editor3d.cursor.shouldUpdate = false;
     });
@@ -198,40 +175,40 @@ editor3d.init = function() {
     });
 
     // patch refreshGameData function to include 3d data
-    editor3d.patch(bitsy, 'refreshGameData', function () {
+    b3d.patch(bitsy, 'refreshGameData', function () {
         b3d.serializeData();
     });
 
     // patch delete room function to fix crash when deleting rooms from vanilla room panel
-    editor3d.patch(bitsy, 'deleteRoom',
+    b3d.patch(bitsy, 'deleteRoom',
         function () {
-            editor3d._patchContext.deletedRoom = bitsy.curRoom;
+            b3d._patchContext.deletedRoom = bitsy.curRoom;
         },
         function () {
             // check if the room was actually deleted after the dialog
-            var deletedRoom = editor3d._patchContext.deletedRoom;
+            var deletedRoom = b3d._patchContext.deletedRoom;
             if (bitsy.curRoom !== deletedRoom) {
                 b3d.unregisterRoomFromStack(deletedRoom);
                 bitsy.refreshGameData();
             }
-            delete editor3d._patchContext.deletedRoom;
+            delete b3d._patchContext.deletedRoom;
         }
     );
 
     // update b3d.meshConfig when drawings are added, duplicated and deleted
     ['newDrawing', 'duplicateDrawing'].forEach(function (f) {
-        editor3d.patch(bitsy, f, null, function () {
+        b3d.patch(bitsy, f, null, function () {
             var drawing = bitsy.drawing.getEngineObject();
             b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
         });
     });
-    editor3d.patch(bitsy, 'deleteDrawing',
+    b3d.patch(bitsy, 'deleteDrawing',
        function () {
-            editor3d._patchContext.deletedDrawingId = bitsy.drawing.getEngineObject().drw;
+            b3d._patchContext.deletedDrawingId = bitsy.drawing.getEngineObject().drw;
         },
         function () {
-            delete b3d.meshConfig[editor3d._patchContext.deletedDrawingId];
-            delete editor3d._patchContext.deletedDrawingId;
+            delete b3d.meshConfig[b3d._patchContext.deletedDrawingId];
+            delete b3d._patchContext.deletedDrawingId;
         }
     );
 
@@ -276,19 +253,6 @@ editor3d.init = function() {
     };
     
 }; // editor3d.init()
-
-// helper function to patch functions
-editor3d.patch = function (scope, name, before, after) {
-    var original = scope[name];
-    var patched = function () {
-        if (before) before.apply(scope, arguments);
-        var output = original.apply(scope, arguments);
-        if (after) after.apply(scope, arguments);
-        return output;
-    }
-    scope[name] = patched;
-};
-editor3d._patchContext = {};
 
 // clear caches to force textures and meshes to update
 editor3d.updateTextureOneTimeListener = function(e) {
@@ -701,12 +665,13 @@ editor3d.update = function () {
             }));
     }
 
-    b3d.scene.render();
+    b3d.render();
+
     // screenshots
     if (editor3d.takeScreenshot) {
         var link = document.createElement("a");
         link.download = bitsy.title + '.png';
-        link.href = editor3d.canvas.toDataURL();
+        link.href = b3d.sceneCanvas.toDataURL();
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

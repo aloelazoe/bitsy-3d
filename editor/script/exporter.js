@@ -46,10 +46,7 @@ this.exportGame = function(gameData, title, pageColor, filename, isFixedSize, si
 
 	// include 3d hack
 	html = replaceTemplateMarker( html, "@@babylon", Resources["babylon.js"] );
-	html = replaceTemplateMarker( html, "@@b3dCore", Resources["b3d-core.js"] );
-	html = replaceTemplateMarker( html, "@@kitsy", Resources["kitsy.js"] );
-	html = replaceTemplateMarker( html, "@@smoothMoves", Resources["smooth-moves.js"] );
-	html = replaceTemplateMarker( html, "@@b3dGame", Resources["b3d-game.js"] );
+	html = replaceTemplateMarker( html, "@@bitsy3d", Resources["bitsy3d.js"] );
 
 	ExporterUtils.DownloadFile( filename, html );
 }

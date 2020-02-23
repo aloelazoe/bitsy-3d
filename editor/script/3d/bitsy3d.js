@@ -28,11 +28,16 @@ var b3d = {
 
     caches: {},
 
-    playerRef: null,
+    avatarRef: null,
+    avatarNode: null,
 
     // when set to true, drawing replacements won't be applied,
     // and drawings set to have empty meshes will have their default visible meshes instead
     debugView: false,
+
+    sceneCanvas: null,
+    textCanvas: null,
+    textContext: null,
 
     spriteLastPos: {},
     tweens: {},
@@ -42,22 +47,72 @@ var b3d = {
         t = 1 - ((1 - t) ** 2);
         return t;
     },
+
+    dialogDirty: false,
 };
 
-b3d.init = function (canvas) {
-    b3d.engine = new BABYLON.Engine(canvas, false);
+document.addEventListener('DOMContentLoaded', function() {
+    // remove borksy touch control fix that breaks camera controls
+    var touchTriggerEl = document.getElementById('touchTrigger');
+    if (touchTriggerEl) touchTriggerEl.parentElement.removeChild(touchTriggerEl);
+    
+    if (bitsy.EditMode === undefined) {
+        // if we are in exported game, patch bitsy with 3d functions
+        b3d.patch(bitsy, 'startExportedGame', null, function () {
+            b3d.init();
+        });
+        b3d.patch(bitsy, 'update', null, function () {
+            b3d.update();
+            b3d.render();
+        });
+    }
+});
+
+// helper function to patch functions
+b3d.patch = function (scope, name, before, after) {
+    var original = scope[name];
+    var patched = function () {
+        if (before) before.apply(scope, arguments);
+        var output = original.apply(scope, arguments);
+        if (after) after.apply(scope, arguments);
+        return output;
+    }
+    scope[name] = patched;
+};
+b3d._patchContext = {};
+
+b3d.init = function () {    
+    if (bitsy.isPlayerEmbeddedInEditor) {
+        b3d.sceneCanvas = document.getElementById('sceneCanvas');
+        b3d.textCanvas = document.getElementById('textCanvas');
+    } else {
+        // if not in the editor, do the setup specific for exported game
+        // hide the original canvas and add a stylesheet
+        // to make the 3D render in its place
+        bitsy.canvas.parentElement.removeChild(bitsy.canvas);
+        var style = `html { font-size: 0; } canvas { -ms-interpolation-mode: nearest-neighbor;  image-rendering: -moz-crisp-edges;  image-rendering: pixelated; } canvas:focus { outline: none; } #gameContainer { width: 100vw; max-width: 100vh; margin: auto; } #gameContainer > * { width: 100%; height: 100%; } #gameContainer > #textCanvas { margin-top: -100%; background: none; pointer-events: none; }`;
+        var sheet = document.createElement('style');
+        sheet.textContent = style;
+        document.head.appendChild(sheet);
+
+        var gameContainer = document.createElement('div');
+        gameContainer.id = 'gameContainer';
+        document.body.appendChild(gameContainer);
+
+        b3d.sceneCanvas = document.createElement('canvas');
+        b3d.sceneCanvas.id = 'sceneCanvas';
+        gameContainer.appendChild(b3d.sceneCanvas);
+
+        b3d.textCanvas = document.createElement('canvas');
+        b3d.textCanvas.id = 'textCanvas';
+        gameContainer.appendChild(b3d.textCanvas);
+        b3d.textContext = b3d.textCanvas.getContext('2d');
+    }
+
+    b3d.engine = new BABYLON.Engine(b3d.sceneCanvas, false);
     b3d.scene = new BABYLON.Scene(b3d.engine);
     b3d.scene.ambientColor = new BABYLON.Color3(1, 1, 1);
     b3d.scene.freezeActiveMeshes();
-
-    // create basic resources
-    b3d.meshTemplates = b3d.initMeshTemplates();
-
-    // material
-    b3d.baseMat = new BABYLON.StandardMaterial('base material', b3d.scene);
-    b3d.baseMat.ambientColor = new BABYLON.Color3(1, 1, 1);
-    b3d.baseMat.maxSimultaneousLights = 0;
-    b3d.baseMat.freeze();
 
     // watch for browser/canvas resize events
     b3d.engine.setSize(b3d.size.width, b3d.size.height);
@@ -68,8 +123,43 @@ b3d.init = function (canvas) {
         });
     }
 
+    // set up text canvas
+    b3d.textCanvas.width = bitsy.canvas.width;
+    b3d.textCanvas.height = bitsy.canvas.height;
+    b3d.textContext = b3d.textCanvas.getContext('2d');
+    bitsy.dialogRenderer.AttachContext(b3d.textContext);
+
+    // create basic resources
+    b3d.meshTemplates = b3d.initMeshTemplates();
+
+    // material
+    b3d.baseMat = new BABYLON.StandardMaterial('base material', b3d.scene);
+    b3d.baseMat.ambientColor = new BABYLON.Color3(1, 1, 1);
+    b3d.baseMat.maxSimultaneousLights = 0;
+    b3d.baseMat.freeze();
+
     // initialize b3d.meshConfig, b3d.roomsInStack and b3d.stackPosOfRoom by parsing serialized data
     b3d.parseData();
+
+    b3d.avatarNode = new BABYLON.TransformNode('avatarNode');
+
+    // set up camera
+    // todo: make a proper camera
+    var camera = new BABYLON.ArcRotateCamera("EditorCamera", Math.PI / 2, Math.PI / 2, 15, new BABYLON.Vector3(8,0,8), b3d.scene);
+    // perspective clipping
+    camera.position = new BABYLON.Vector3(7.5,10,-16);
+    camera.minZ = 0.001;
+    camera.maxZ = bitsy.mapsize * 5;
+    // zoom
+    camera.wheelPrecision = bitsy.mapsize;
+    camera.upperRadiusLimit = 30;
+    camera.lowerRadiusLimit = 1;
+
+    camera.lowerHeightOffsetLimit = 0;
+    camera.upperHeightOffsetLimit = bitsy.mapsize / 2;
+    camera.upperBetaLimit = Math.PI / 2;
+
+    camera.attachControl(b3d.sceneCanvas);
 };
 
 b3d.parseData = function () {
@@ -767,7 +857,29 @@ b3d.update = function () {
 
     b3d.lastStack = b3d.curStack;
     b3d.lastRoom = bitsy.curRoom;
+
+    // clear out the text context when not in use
+    if (!bitsy.dialogBuffer.IsActive() || (bitsy.isPlayerEmbeddedInEditor && !bitsy.isPlayMode)) {
+        if (b3d.dialogDirty) {
+            b3d.textContext.clearRect(0, 0, b3d.textCanvas.width, b3d.textCanvas.height);
+            b3d.dialogDirty = false;
+        }
+    } else {
+        b3d.dialogDirty = true;
+    }
 }; // b3d.update()
+
+b3d.render = function () {
+    // clear scene when rendering title/endings
+    // using a FOV hack here instead of the engine's clear function
+    // in order to ensure post-processing isn't overridden
+    var fov = b3d.scene.activeCamera.fov;
+    if ((!isPlayerEmbeddedInEditor || isPlayMode) && (bitsy.isNarrating || bitsy.isEnding)) {
+        b3d.scene.activeCamera.fov = 0;
+    }
+    b3d.scene.render();
+    b3d.scene.activeCamera.fov = fov;
+};
 
 b3d.isRoomVisible = function (roomId) {
     // true if the room is the current room or we are in the stack and the room is not a stray room and is in the current stack
@@ -982,6 +1094,6 @@ b3d.meshExtraSetup = function (drawing, mesh) {
         mesh.freezeWorldMatrix();
     }
     if (drawing === bitsy.player()) {
-        b3d.playerRef = mesh;
+        b3d.avatarRef = mesh;
     }
 };
