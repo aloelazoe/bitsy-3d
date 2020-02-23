@@ -19,6 +19,8 @@ var b3d = {
     stackPosOfRoom: {},
     
     curStack: null,
+    lastStack: null,
+    lastRoom: null,
 
     sprites: {},
     items: {},
@@ -31,6 +33,15 @@ var b3d = {
     // when set to true, drawing replacements won't be applied,
     // and drawings set to have empty meshes will have their default visible meshes instead
     debugView: false,
+
+    spriteLastPos: {},
+    tweens: {},
+    tweenDistance: 1.5,
+    tweenDuration: 150,
+    tweenFunction: function (t) {
+        t = 1 - ((1 - t) ** 2);
+        return t;
+    },
 };
 
 b3d.init = function (canvas) {
@@ -584,6 +595,8 @@ b3d.clearCachesMesh = function (drw) {
 b3d.update = function () {
     // console.log("update called");
     b3d.curStack = b3d.stackPosOfRoom[bitsy.curRoom] && b3d.stackPosOfRoom[bitsy.curRoom].stack || null;
+    var didChangeScene = b3d.curStack? b3d.curStack !== b3d.lastStack: bitsy.curRoom !== b3d.lastRoom;
+    var editorMode = bitsy.isPlayerEmbeddedInEditor && !bitsy.isPlayMode;
 
     // sprite changes
     Object.entries(b3d.sprites).forEach(function (entry) {
@@ -591,23 +604,40 @@ b3d.update = function () {
         var mesh = entry[1];
         var s = bitsy.sprite[id];
         if (s && b3d.isRoomVisible(s.room)) {
-        // if the sprite still exits, is in the current room or in the current stack
+        // if the sprite still exists, is in the current room or in the current stack
         // update sprite's position
-            mesh.position.x = s.x;
-            mesh.position.z = bitsy.mapsize - 1 - s.y;
-            mesh.position.y = b3d.curStack && b3d.stackPosOfRoom[s.room].pos || 0;
             mesh.bitsyOrigin.x = s.x;
             mesh.bitsyOrigin.y = s.y;
             mesh.bitsyOrigin.roomId = s.room;
+
+            var targetX = mesh.position.x = s.x;
+            var targetZ = mesh.position.z = bitsy.mapsize - 1 - s.y;
+            var targetY = mesh.position.y = b3d.curStack && b3d.stackPosOfRoom[s.room].pos || 0;
+
+            b3d.spriteLastPos[id] = b3d.spriteLastPos[id] || new BABYLON.Vector3(targetX, targetY, targetZ);
+            var lastPos = b3d.spriteLastPos[id];
+
+            if (!editorMode && !lastPos.equalsToFloats(targetX, targetY, targetZ) && lastPos.subtractFromFloats(targetX, targetY, targetZ).length() <= b3d.tweenDistance) {
+                // add a tween
+                b3d.tweens[id] = {
+                    from: lastPos.clone(),
+                    to: new BABYLON.Vector3(targetX, targetY, targetZ),
+                    start: bitsy.prevTime,
+                };
+            }
+            // remember current position
+            lastPos.copyFromFloats(targetX, targetY, targetZ);
         } else {
         // otherwise remove the sprite
             mesh.dispose();
             mesh = null;
             delete b3d.sprites[id];
+            delete b3d.tweens[id];
+            delete b3d.spriteLastPos[id];
         }
     });
     Object.values(bitsy.sprite).filter(function (s) {
-        // go through bitsy b3d.sprites and get those that should be currently displayed
+        // go through bitsy sprites and get those that should be currently displayed
         return b3d.isRoomVisible(s.room);
     }).forEach(function (s) {
         var id = s.id;
@@ -621,6 +651,31 @@ b3d.update = function () {
             b3d.sprites[id] = oldMesh = newMesh;
         }
     });
+    // remove existing tweens when changing the scene
+    if (didChangeScene || editorMode) {
+        Object.keys(b3d.tweens).forEach(function(k){
+            delete b3d.tweens[k];
+        });
+    }
+    // apply tweens
+    if (!editorMode) {
+        Object.entries(b3d.tweens).forEach(function (entry) {
+            var id = entry[0];
+            var tween = entry[1];
+            var t = (bitsy.prevTime - tween.start) / b3d.tweenDuration;
+            if (t < 1) {
+                BABYLON.Vector3.LerpToRef(
+                    tween.from,
+                    tween.to,
+                    b3d.tweenFunction(t),
+                    b3d.sprites[id].position
+                );
+            } else {
+                delete b3d.tweens[id];
+            }
+        });
+    }
+
 
     // item changes
     // delete irrelevant b3d.items
@@ -709,6 +764,9 @@ b3d.update = function () {
     // bg changes
     b3d.scene.clearColor = b3d.getColor(b3d.clearColor);
     b3d.scene.fogColor = b3d.getColor(b3d.fogColor);
+
+    b3d.lastStack = b3d.curStack;
+    b3d.lastRoom = bitsy.curRoom;
 }; // b3d.update()
 
 b3d.isRoomVisible = function (roomId) {
