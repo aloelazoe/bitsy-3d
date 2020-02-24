@@ -15,6 +15,8 @@ var b3d = {
         tweenDuration: 150,
     },
 
+    cameras: [],
+
     engine: null,
     scene: null,
 
@@ -54,6 +56,48 @@ var b3d = {
     },
 
     dialogDirty: false,
+};
+
+b3d.cameraDataModel = {
+    commonProperties: {
+        value: ['name', 'fov', 'inertia'],
+        vector3: ['target'],
+    },
+    cameraTypes: {
+        arc: {
+            class: BABYLON.ArcRotateCamera,
+            value: ['alpha', 'beta', 'radius'],
+            trait: ['attachControl'],
+        },
+        universal: {
+            class: BABYLON.UniversalCamera,
+            vector3: ['position', 'rotation'],
+        },
+    },
+    propertyTypes: {
+        vector3: {
+            class: BABYLON.Vector3,
+            value: ['x', 'y', 'z'],
+        },
+    },
+    traits: {
+        attachControl: function (camera) {
+            this.camera = camera;
+            this._state = false;
+            this.set = function (arg) {
+                if (arg === true) {
+                    camera.engineCameraRef.attachControl(b3d.sceneCanvas);
+                    this._state = true;
+                } else if (arg === false) {
+                    camera.engineCameraRef.detachControl(b3d.sceneCanvas);
+                    this._state = false;
+                }
+            };
+            this.get = function () {
+                return this._state;
+            };
+        },
+    },
 };
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -233,7 +277,74 @@ b3d.parseDataFromDialog = function () {
         });
     }
 
+    // todo: parse cameras
+
+    // if (parsed && parsed.options) {
+    //     b3d.options = parsed.options;
+    // }
+
     return Boolean(serialized);
+};
+
+b3d.initCameras = function (parsedCameras) {
+    b3d.cameras = parsedCameras.map(function (camData) {
+        return new b3d.Camera(camData);
+    });
+    if (b3d.cameras.length < 1 || !parsedCameras) {
+        // var defaultCamera = 
+        // b3d.cameras.push(defaultCamera);
+        // b3d.scene.activeCamera = defaultCamera;
+    }
+};
+
+// create a camera from serialized data
+b3d.Camera = function (camData) {
+    if (!camData || !b3d.cameraDataModel.cameraTypes[camData.type]) return;
+
+    this.engineCameraRef = new b3d.cameraDataModel.cameraTypes[camData.type].class();
+
+    // set value properties from data
+    [].concat(
+        b3d.cameraDataModel.commonProperties.value || [],
+        b3d.cameraDataModel.cameraTypes[camData.type].value || [],
+    )
+    .forEach(function (v) {
+        if (camData[v] !== undefined && camData[v] !== null) this.engineCameraRef[v] = camData[v];
+    }, this);
+
+    // create and set object proerties from data
+    Object.keys(b3d.cameraDataModel.propertyTypes).forEach(function (pType) {
+        [].concat(
+            b3d.cameraDataModel.commonProperties[pType] || [],
+            b3d.cameraDataModel.cameraTypes[camData.type][pType] || [],
+        )
+        .forEach(function (p) {
+            if (camData[p] !== undefined && camData[p] !== null) {
+                this.engineCameraRef[p] = new b3d.cameraDataModel.propertyTypes[pType].class();
+                b3d.cameraDataModel.propertyTypes[pType].value.forEach(function (v) {
+                    if (camData[p] !== undefined && camData[p] !== null) this.engineCameraRef[p][v] = camData[p][v];
+                }, this);
+            }
+        }, this);
+    }, this);
+
+    // set camera traits
+    this.traits = {};
+    [].concat(
+        b3d.cameraDataModel.commonProperties.trait || [],
+        b3d.cameraDataModel.cameraTypes[camData.type].trait || [],
+    )
+    .forEach(function (t) {
+        if (camData[t] !== undefined && camData[t] !== null) {
+            this.traits[t] = new b3d.cameraDataModel.traits[t](this);
+            this.traits[t].set(camData[t]);
+        }
+    }, this);
+
+    // define methods
+    this.setActive = function (argument) {
+        b3d.scene.activeCamera = this.engineCameraRef;
+    }
 };
 
 b3d.getDefaultMeshProps = function (drawing) {
@@ -360,15 +471,54 @@ b3d.serializeDataAsDialog = function () {
         }
     });
 
+
+    // todo: serialize cameras
+    // var camerasSerialized = b3d.cameras.map(function (cam) {
+    //     return b3d.serializeCamera(cam);
+    // });
+
     var result = JSON.stringify({
+        // options: b3d.options,
         mesh: meshSerialized,
         stack: stackSerialized
+        // cameras: camerasSerialized,
     }, null, 2);
     // console.log(result);
     bitsy.dialog['DATA3D'] = '"""\n' + result + '\n"""';
 }; // b3d.serializeDataAsDialog
 
 b3d.serializeData = b3d.serializeDataAsDialog;
+
+b3d.serializeCamera = function(camera) {
+    var result = {};
+    Object.entries(b3d.cameraDataModel.cameraTypes).forEach(function (entry) {
+        if (camera.engineCameraRef instanceof entry[1].class) result.type = entry[0];
+    });
+    if (!result.type) {
+        console.error('camera of this type cannot be serialized');
+        return;
+    }
+
+    [].concat(
+        b3d.cameraDataModel.commonProperties.value || [],
+        b3d.cameraDataModel.commonProperties.vector3 || [],
+        b3d.cameraDataModel.cameraTypes[result.type].value || [],
+        b3d.cameraDataModel.cameraTypes[result.type].vector3 || [],
+    )
+    .forEach(function (p) {
+        result[p] = camera.engineCameraRef[p];
+    });
+
+    [].concat(  
+        b3d.cameraDataModel.commonProperties.trait || [],
+        b3d.cameraDataModel.cameraTypes[result.type].trait || [],
+    )
+    .forEach(function (t) {
+        result[t] = camera.traits[t].get();
+    });
+
+    return result;
+};
 
 b3d.serializeTransform = function (transform) {
     // serialize transform matrix as an array:
@@ -1107,7 +1257,7 @@ b3d.meshExtraSetup = function (drawing, mesh) {
 };
 
 b3d.cameraStateSnapshot = {
-    propertyList: ['alpha', 'beta', 'radius', 'fov', 'target'],
+    propertyList: ['alpha', 'beta', 'radius', 'fov', 'target', 'inertia'],
     take: function () {
         var obj = {};
         this.propertyList.forEach(function (p) {
