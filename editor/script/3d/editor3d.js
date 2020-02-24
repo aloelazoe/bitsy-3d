@@ -49,8 +49,6 @@ editor3d.cursor = {
 };
 
 editor3d.init = function() {
-    b3d.size.width = 512;
-    b3d.size.height = 512;
     b3d.init();
 
     editor3d.suggestReplacingNameTags();

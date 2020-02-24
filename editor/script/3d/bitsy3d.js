@@ -1,15 +1,22 @@
 var bitsy = window;
 
 var b3d = {
+    options: {
+        engineWidth: 512,
+        engineHeight: 512,
+        engineAutoResize: true,
+
+        clearColor: 0,
+        fogColor: 0,
+
+        // todo: dialog position
+
+        tweenDistance: 1.5,
+        tweenDuration: 150,
+    },
+
     engine: null,
     scene: null,
-    size: {
-        auto: true,
-        width: 512,
-        height: 512,
-    },
-    clearColor: 0,
-    fogColor: 0,
 
     meshTemplates: {},
     baseMat: null,
@@ -41,8 +48,6 @@ var b3d = {
 
     spriteLastPos: {},
     tweens: {},
-    tweenDistance: 1.5,
-    tweenDuration: 150,
     tweenFunction: function (t) {
         t = 1 - ((1 - t) ** 2);
         return t;
@@ -114,9 +119,12 @@ b3d.init = function () {
     b3d.scene.ambientColor = new BABYLON.Color3(1, 1, 1);
     b3d.scene.freezeActiveMeshes();
 
+    // set engine size. these dimensions can be different from the canvas dimensions
+    // but if canvas doesn't have set dimensions, they will be set to these and will remain fixed
+    b3d.engine.setSize(b3d.options.engineWidth, b3d.options.engineHeight);
     // watch for browser/canvas resize events
-    b3d.engine.setSize(b3d.size.width, b3d.size.height);
-    if (b3d.size.auto) {
+    if (b3d.options.engineAutoResize) {
+        // resize engine according to the canvas size
         b3d.engine.resize();
         window.addEventListener("resize", function () {
             b3d.engine.resize();
@@ -707,7 +715,7 @@ b3d.update = function () {
             b3d.spriteLastPos[id] = b3d.spriteLastPos[id] || new BABYLON.Vector3(targetX, targetY, targetZ);
             var lastPos = b3d.spriteLastPos[id];
 
-            if (!editorMode && !lastPos.equalsToFloats(targetX, targetY, targetZ) && lastPos.subtractFromFloats(targetX, targetY, targetZ).length() <= b3d.tweenDistance) {
+            if (!editorMode && !lastPos.equalsToFloats(targetX, targetY, targetZ) && lastPos.subtractFromFloats(targetX, targetY, targetZ).length() <= b3d.options.tweenDistance) {
                 // add a tween
                 b3d.tweens[id] = {
                     from: lastPos.clone(),
@@ -752,7 +760,7 @@ b3d.update = function () {
         Object.entries(b3d.tweens).forEach(function (entry) {
             var id = entry[0];
             var tween = entry[1];
-            var t = (bitsy.prevTime - tween.start) / b3d.tweenDuration;
+            var t = (bitsy.prevTime - tween.start) / b3d.options.tweenDuration;
             if (t < 1) {
                 BABYLON.Vector3.LerpToRef(
                     tween.from,
@@ -852,8 +860,8 @@ b3d.update = function () {
     });
 
     // bg changes
-    b3d.scene.clearColor = b3d.getColor(b3d.clearColor);
-    b3d.scene.fogColor = b3d.getColor(b3d.fogColor);
+    b3d.scene.clearColor = b3d.getColor(b3d.options.clearColor);
+    b3d.scene.fogColor = b3d.getColor(b3d.options.fogColor);
 
     b3d.lastStack = b3d.curStack;
     b3d.lastRoom = bitsy.curRoom;
