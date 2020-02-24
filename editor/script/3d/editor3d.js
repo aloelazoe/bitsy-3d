@@ -38,6 +38,14 @@ editor3d.cursor = {
     isShiftDown: false,
     // track if cursor mode was modified by holding down alt for switching to select mode
     modeBeforeModified: null,
+    turnOn: function () {
+        this.shouldUpdate = true;
+    },
+    turnOff: function () {
+        this.shouldUpdate = false;
+        this.isValid = false;
+        this.mesh.isVisible = false;
+    },
 };
 
 editor3d.init = function() {
@@ -74,12 +82,12 @@ editor3d.init = function() {
     // add event listeners
     b3d.sceneCanvas.addEventListener('mouseover', function (e) {
         // register 3d cursor update & mouse picking
-        editor3d.cursor.shouldUpdate = true;
+        editor3d.cursor.turnOn();
     });
 
     b3d.sceneCanvas.addEventListener('mouseleave', function (e) {
         // unregister 3d cursor update & mouse picking
-        editor3d.cursor.shouldUpdate = false;
+        editor3d.cursor.turnOff();
     });
 
     // switch cursor mode when starting to hold alt and shift
@@ -135,9 +143,7 @@ editor3d.init = function() {
     b3d.scene.onPointerMove = function (e) {
         // don't update the cursor when moving the camera
         if (editor3d.cursor.shouldUpdate && editor3d.cursor.isMouseDown) {
-            editor3d.cursor.shouldUpdate = false;
-            editor3d.cursor.isValid = false;
-            editor3d.cursor.mesh.isVisible = false;
+            editor3d.cursor.turnOff();
         }
     };
 
@@ -356,7 +362,7 @@ editor3d.newStackId = function () {
 editor3d.onPointerUp = function (e) {
     editor3d.cursor.isMouseDown = false;
     // continue updating cursor after moving the camera
-    editor3d.cursor.shouldUpdate = true;
+    editor3d.cursor.turnOn();
 
     // do editor actions logic here
     if (!editor3d.cursor.isValid) return;
@@ -653,7 +659,7 @@ editor3d.update = function () {
     b3d.update();
 
     // update cursor
-    if (editor3d.cursor.shouldUpdate) {
+    if (!bitsy.isPlayMode && editor3d.cursor.shouldUpdate) {
         editor3d.updateCursor(b3d.scene.pick(
             b3d.scene.pointerX, b3d.scene.pointerY,
             function(m) {
