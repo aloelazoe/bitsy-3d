@@ -548,7 +548,7 @@ function update() {
 				if( playerHoldToMoveTimer <= 0 )
 				{
 					movePlayer( curPlayerDirection );
-					playerHoldToMoveTimer = 150;
+					playerHoldToMoveTimer = playerHoldToMoveInterval;
 				}
 			}
 		}
@@ -615,7 +615,7 @@ function updateInput() {
 
 		if (curPlayerDirection != Direction.None && curPlayerDirection != prevPlayerDirection) {
 			movePlayer( curPlayerDirection );
-			playerHoldToMoveTimer = 500;
+			playerHoldToMoveTimer = playerSecondStepInterval;
 		}
 	}
 }
@@ -767,6 +767,8 @@ var Direction = {
 
 var curPlayerDirection = Direction.None;
 var playerHoldToMoveTimer = 0;
+var playerHoldToMoveInterval = 150;
+var playerSecondStepInterval = 500;
 
 var InputManager = function() {
 	var self = this;
