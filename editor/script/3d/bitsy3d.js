@@ -75,44 +75,22 @@ b3d.cameraDataModel = {
             vector3: ['position', 'rotation'],
         },
     },
-    propertyTypes: {
-        vector3: {
-            class: BABYLON.Vector3,
-            value: ['x', 'y', 'z'],
+    traitEffects: {
+        // to be used inside camera trait setters
+        // 'this' should refer to camera object
+        attachControl: function (v) {
+            if (v === true) {
+                this.ref.attachControl(b3d.sceneCanvas);
+            } else if (v === false) {
+                this.ref.detachControl(b3d.sceneCanvas);
+            }
         },
-    },
-    traits: {
-        attachControl: function (camera) {
-            this.camera = camera;
-            this._state = false;
-            this.set = function (arg) {
-                if (arg === true) {
-                    camera.engineCameraRef.attachControl(b3d.sceneCanvas);
-                    this._state = true;
-                } else if (arg === false) {
-                    camera.engineCameraRef.detachControl(b3d.sceneCanvas);
-                    this._state = false;
-                }
-            };
-            this.get = function () {
-                return this._state;
-            };
-        },
-        followAvatar: function (camera) {
-            this.camera = camera;
-            this._state = false;
-            this.set = function (arg) {
-                if (arg === true) {
-                    camera.engineCameraRef.lockedTarget = b3d.avatarNode;
-                    this._state = true;
-                } else if (arg === false) {
-                    camera.engineCameraRef.lockedTarget = null;
-                    this._state = false;
-                }
-            };
-            this.get = function () {
-                return this._state;
-            };
+        followAvatar: function (v) {
+            if (v === true) {
+                this.ref.lockedTarget = b3d.avatarNode;
+            } else if (v === false) {
+                this.ref.lockedTarget = null;
+            }
         },
     },
 };
@@ -330,53 +308,101 @@ b3d.initCameras = function (parsedCameras) {
 };
 
 // create a camera from serialized data
-b3d.Camera = function (camData) {
-    if (!camData || !b3d.cameraDataModel.cameraTypes[camData.type]) return;
+b3d.createCamera = function (camData) {
+    if (!camData) {
+        return;
+    } else if (!camData.type) {
+        console.error("couldn't create camera: camera type wasn't specified");
+        return;
+    } else if (!b3d.cameraDataModel.cameraTypes[camData.type]) {
+        console.error(`couldn't create camera: camera type '${camData.type}' isn't supported"`);
+        return;
+    }
 
-    this.engineCameraRef = new b3d.cameraDataModel.cameraTypes[camData.type].class();
+    var camera = {};
 
-    // set value properties from data
+    // define read-only camera type
+    Object.defineProperty(camera, 'type', {
+        configurable: false,
+        enumerable: true,
+        writable: false,
+        value: camData.type,
+    });
+
+    // camera.ref will hold a reference to babylonjs camera
+    Object.defineProperty(camera, 'ref', {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: new b3d.cameraDataModel.cameraTypes[camData.type].class(),
+    });
+
+    // set up value properties
     [].concat(
         b3d.cameraDataModel.commonProperties.value || [],
         b3d.cameraDataModel.cameraTypes[camData.type].value || [],
     )
     .forEach(function (v) {
-        if (camData[v] !== undefined && camData[v] !== null) this.engineCameraRef[v] = camData[v];
-    }, this);
+        Object.defineProperty(camera, v, {
+            configurable: true,
+            enumerable: true,
+            get: function () { return this.ref[v]; },
+            set: function (a) { this.ref[v] = a; },
+        });
+        if (camData[v] !== undefined && camData[v] !== null) {
+            camera[v] = camData[v];
+        }
+    });
 
-    // create and set object proerties from data
-    Object.keys(b3d.cameraDataModel.propertyTypes).forEach(function (pType) {
-        [].concat(
-            b3d.cameraDataModel.commonProperties[pType] || [],
-            b3d.cameraDataModel.cameraTypes[camData.type][pType] || [],
-        )
-        .forEach(function (p) {
-            if (camData[p] !== undefined && camData[p] !== null) {
-                this.engineCameraRef[p] = new b3d.cameraDataModel.propertyTypes[pType].class();
-                b3d.cameraDataModel.propertyTypes[pType].value.forEach(function (v) {
-                    if (camData[p] !== undefined && camData[p] !== null) this.engineCameraRef[p][v] = camData[p][v];
-                }, this);
-            }
-        }, this);
-    }, this);
+    // set up vector properties
+    [].concat(
+        b3d.cameraDataModel.commonProperties.vector3 || [],
+        b3d.cameraDataModel.cameraTypes[camData.type].vector3 || [],
+    )
+    .forEach(function (v) {
+        Object.defineProperty(camera, v, {
+            configurable: true,
+            enumerable: true,
+            get: function () { return this.ref[v]; },
+            set: function (a) { this.ref[v] = a; },
+        });
+        camera[v] = new BABYLON.Vector3();
+        if (camData[v]) {
+            camera[v].copyFromFloats(camData[v].x, camData[v].y, camData[v].z);
+        }
+    });
 
-    // set camera traits
-    this.traits = {};
+    // set up traits
+    // local variable to store internal trait values for this camera
+    var traits = {};
+
     [].concat(
         b3d.cameraDataModel.commonProperties.trait || [],
         b3d.cameraDataModel.cameraTypes[camData.type].trait || [],
     )
     .forEach(function (t) {
+        traits[t] = null;
+        Object.defineProperty(camera, t, {
+            configurable: true,
+            enumerable: true,
+            get: function () { return traits[t]; },
+            set: function (a) {
+                traits[t] = a;
+                // invoke trait effect
+                b3d.cameraDataModel.traitEffects[t].call(this, a);
+            },
+        });
         if (camData[t] !== undefined && camData[t] !== null) {
-            this.traits[t] = new b3d.cameraDataModel.traits[t](this);
-            this.traits[t].set(camData[t]);
+            camera[t] = camData[t];
         }
-    }, this);
+    });
 
     // define methods
-    this.setActive = function (argument) {
-        b3d.scene.activeCamera = this.engineCameraRef;
-    }
+    camera.setActive = function () {
+        b3d.scene.activeCamera = this.ref;
+    };
+
+    return camera;
 };
 
 b3d.getDefaultMeshProps = function (drawing) {
@@ -511,46 +537,15 @@ b3d.serializeDataAsDialog = function () {
 
     var result = JSON.stringify({
         // options: b3d.options,
+        // cameras: b3d.cameras,
         mesh: meshSerialized,
         stack: stackSerialized
-        // cameras: camerasSerialized,
     }, null, 2);
     // console.log(result);
     bitsy.dialog['DATA3D'] = '"""\n' + result + '\n"""';
 }; // b3d.serializeDataAsDialog
 
 b3d.serializeData = b3d.serializeDataAsDialog;
-
-b3d.serializeCamera = function(camera) {
-    var result = {};
-    Object.entries(b3d.cameraDataModel.cameraTypes).forEach(function (entry) {
-        if (camera.engineCameraRef instanceof entry[1].class) result.type = entry[0];
-    });
-    if (!result.type) {
-        console.error('camera of this type cannot be serialized');
-        return;
-    }
-
-    [].concat(
-        b3d.cameraDataModel.commonProperties.value || [],
-        b3d.cameraDataModel.commonProperties.vector3 || [],
-        b3d.cameraDataModel.cameraTypes[result.type].value || [],
-        b3d.cameraDataModel.cameraTypes[result.type].vector3 || [],
-    )
-    .forEach(function (p) {
-        result[p] = camera.engineCameraRef[p];
-    });
-
-    [].concat(  
-        b3d.cameraDataModel.commonProperties.trait || [],
-        b3d.cameraDataModel.cameraTypes[result.type].trait || [],
-    )
-    .forEach(function (t) {
-        result[t] = camera.traits[t].get();
-    });
-
-    return result;
-};
 
 b3d.serializeTransform = function (transform) {
     // serialize transform matrix as an array:
