@@ -62,6 +62,7 @@ b3d.cameraDataModel = {
     commonProperties: {
         value: ['name', 'fov', 'inertia'],
         vector3: ['target'],
+        trait: ['followAvatar'],
     },
     cameraTypes: {
         arc: {
@@ -97,6 +98,37 @@ b3d.cameraDataModel = {
                 return this._state;
             };
         },
+        followAvatar: function (camera) {
+            this.camera = camera;
+            this._state = false;
+            this.set = function (arg) {
+                if (arg === true) {
+                    camera.engineCameraRef.lockedTarget = b3d.avatarNode;
+                    this._state = true;
+                } else if (arg === false) {
+                    camera.engineCameraRef.lockedTarget = null;
+                    this._state = false;
+                }
+            };
+            this.get = function () {
+                return this._state;
+            };
+        },
+    },
+};
+
+b3d.cameraPresets = {
+    defaultCamera: {
+        name: 'defaultCamera',
+        type: 'arc',
+        fov: 0.9,
+        inertia: 0.8,
+        target: {x:8, z: 8, y: 3},
+        alpha: Math.PI,
+        beta: 0,
+        radius: 10,
+        attachControl: false,
+        followAvatar: true,
     },
 };
 
@@ -923,7 +955,8 @@ b3d.update = function () {
             }
         });
     }
-
+    // copy avatar's position into avatarNode
+    b3d.avatarNode.position = b3d.avatarRef.position;
 
     // item changes
     // delete irrelevant b3d.items
