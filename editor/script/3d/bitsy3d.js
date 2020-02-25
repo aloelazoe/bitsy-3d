@@ -200,28 +200,16 @@ b3d.init = function () {
     b3d.baseMat.maxSimultaneousLights = 0;
     b3d.baseMat.freeze();
 
-    // initialize b3d.meshConfig, b3d.roomsInStack and b3d.stackPosOfRoom by parsing serialized data
-    b3d.parseData();
-
+    // create transform node that will copy avatar's position
+    // prevents crashes when used as a camera target when avatar mesh is a billboard
     b3d.avatarNode = new BABYLON.TransformNode('avatarNode');
 
-    // set up camera
-    // todo: make a proper camera
-    var camera = new BABYLON.ArcRotateCamera("EditorCamera", Math.PI / 2, Math.PI / 2, 15, new BABYLON.Vector3(8,0,8), b3d.scene);
-    // perspective clipping
-    camera.position = new BABYLON.Vector3(7.5,10,-16);
-    camera.minZ = 0.001;
-    camera.maxZ = bitsy.mapsize * 5;
-    // zoom
-    camera.wheelPrecision = bitsy.mapsize;
-    camera.upperRadiusLimit = 30;
-    camera.lowerRadiusLimit = 1;
-
-    camera.lowerHeightOffsetLimit = 0;
-    camera.upperHeightOffsetLimit = bitsy.mapsize / 2;
-    camera.upperBetaLimit = Math.PI / 2;
-
-    camera.attachControl(b3d.sceneCanvas);
+    // initialize the following objects by parsing serialized data:
+    // * b3d.meshConfig
+    // * b3d.roomsInStack
+    // * b3d.stackPosOfRoom
+    // * b3d.cameras
+    b3d.parseData();
 };
 
 b3d.parseData = function () {
@@ -287,24 +275,26 @@ b3d.parseDataFromDialog = function () {
         });
     }
 
-    // todo: parse cameras
-
     // if (parsed && parsed.options) {
     //     b3d.options = parsed.options;
     // }
 
+    // load cameras from serialized data
+    b3d.loadCamerasFromData(parsed.cameras);
+
     return Boolean(serialized);
 };
 
-b3d.initCameras = function (parsedCameras) {
-    b3d.cameras = parsedCameras.map(function (camData) {
-        return new b3d.Camera(camData);
-    });
-    if (b3d.cameras.length < 1 || !parsedCameras) {
-        // var defaultCamera = 
-        // b3d.cameras.push(defaultCamera);
-        // b3d.scene.activeCamera = defaultCamera;
+b3d.loadCamerasFromData = function (parsedCameras) {
+    if (!parsedCameras || parsedCameras.length < 1) {
+        b3d.cameras.push(b3d.createCamera(b3d.cameraPresets.defaultCamera));
+    } else {
+        b3d.cameras = parsedCameras.map(function (camData) {
+            return b3d.createCamera(camData);
+        });
     }
+    // todo: choose what camera should be active by default according to options
+    b3d.cameras[0].setActive();
 };
 
 // create a camera from serialized data
@@ -537,7 +527,7 @@ b3d.serializeDataAsDialog = function () {
 
     var result = JSON.stringify({
         // options: b3d.options,
-        // cameras: b3d.cameras,
+        cameras: b3d.cameras,
         mesh: meshSerialized,
         stack: stackSerialized
     }, null, 2);

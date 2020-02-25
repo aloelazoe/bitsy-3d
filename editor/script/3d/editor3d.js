@@ -21,6 +21,8 @@ var editor3d = {
     // track what drawing is selected
     lastSelectedDrawing: null,
 
+    camera: null,
+
     takeScreenshot: false,
 };
 
@@ -52,6 +54,24 @@ editor3d.init = function() {
     b3d.init();
 
     editor3d.suggestReplacingNameTags();
+
+    // create and select editor camera
+    editor3d.camera = new BABYLON.ArcRotateCamera("EditorCamera", Math.PI / 2, Math.PI / 2, 15, new BABYLON.Vector3(8,0,8), b3d.scene);
+    // perspective clipping
+    editor3d.camera.position = new BABYLON.Vector3(7.5,10,-16);
+    editor3d.camera.minZ = 0.001;
+    editor3d.camera.maxZ = bitsy.mapsize * 5;
+    // zoom
+    editor3d.camera.wheelPrecision = bitsy.mapsize;
+    editor3d.camera.upperRadiusLimit = 30;
+    editor3d.camera.lowerRadiusLimit = 1;
+
+    editor3d.camera.lowerHeightOffsetLimit = 0;
+    editor3d.camera.upperHeightOffsetLimit = bitsy.mapsize / 2;
+    editor3d.camera.upperBetaLimit = Math.PI / 2;
+
+    editor3d.camera.attachControl(b3d.sceneCanvas);
+    b3d.scene.activeCamera = editor3d.camera;
 
     // make a mesh for 3d cursor
     editor3d.cursor.mesh = BABYLON.MeshBuilder.CreateBox('cursor', { size: 1.1 }, b3d.scene);
@@ -170,7 +190,17 @@ editor3d.init = function() {
         b3d.roomsInStack = {};
         b3d.stackPosOfRoom = {};
         b3d.meshConfig = {};
+
+        // delete cameras
+        b3d.cameras.forEach(function(c){c.ref.dispose()});
+        b3d.cameras = [];
+
+        // reload data
         b3d.parseData();
+
+        // set editor camera as active again
+        b3d.scene.activeCamera = editor3d.camera;
+
         editor3d.suggestReplacingNameTags();
         // clear all caches to force all drawings to reset during the update
         b3d.clearCaches(Object.values(b3d.caches));
@@ -215,6 +245,16 @@ editor3d.init = function() {
             delete b3d._patchContext.deletedDrawingId;
         }
     );
+
+    // patch functions that are called when switching play mode on and off
+    b3d.patch(bitsy, 'on_play_mode', null, function () {
+        // todo: choose what camera should be active by default according to options
+        b3d.cameras[0].setActive();
+    });
+
+    b3d.patch(bitsy, 'on_edit_mode', null, function () {
+        b3d.scene.activeCamera = editor3d.camera;
+    });
 
     // change the behavior of 'find drawing' panel to allow viewing drawings
     // of different types without automatically selecting a drawing of that type
