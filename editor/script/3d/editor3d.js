@@ -66,8 +66,6 @@ editor3d.init = function() {
     editor3d.camera.upperRadiusLimit = 30;
     editor3d.camera.lowerRadiusLimit = 1;
 
-    editor3d.camera.lowerHeightOffsetLimit = 0;
-    editor3d.camera.upperHeightOffsetLimit = bitsy.mapsize / 2;
     editor3d.camera.upperBetaLimit = Math.PI / 2;
 
     editor3d.camera.attachControl(b3d.sceneCanvas);

@@ -56,18 +56,56 @@ var b3d = {
     },
 
     dialogDirty: false,
+
+    defaultCameraPreset: 'free first person',
+};
+
+b3d.cameraPresets = {
+    'orbiter': {
+        name: 'orbiter',
+        type: 'arc',
+        fov: 0.9,
+        inertia: 0.8,
+        target: {x:8, z: 8, y: 3},
+        alpha: -Math.PI/2,
+        beta: Math.PI/3,
+        radius: 14,
+        lowerRadiusLimit: 12,
+        upperRadiusLimit: 18,
+        attachControl: true,
+        followAvatar: true,
+    },
+    'fixed position follower': {
+        type: 'universal',
+        position: {x: 0, z: 0, y: 18},
+        followAvatar: true,
+    },
+    'free first person': {
+        type: 'arc',
+        fov: 1,
+        inertia: 0.6,
+        alpha: -Math.PI/2,
+        beta: Math.PI/2,
+        radius: 1,
+        lowerRadiusLimit: 0.0001,
+        upperRadiusLimit: 0.0001,
+        minZ: 0.001,
+        maxZ: 100,
+        attachControl: true,
+        followAvatar: true,
+    },
 };
 
 b3d.cameraDataModel = {
     commonProperties: {
-        value: ['name', 'fov', 'inertia'],
+        value: ['name', 'fov', 'inertia', 'minZ', 'maxZ'],
         vector3: ['target'],
         trait: ['followAvatar'],
     },
     cameraTypes: {
         arc: {
             class: BABYLON.ArcRotateCamera,
-            value: ['alpha', 'beta', 'radius'],
+            value: ['alpha', 'beta', 'radius', 'lowerRadiusLimit', 'upperRadiusLimit'],
             trait: ['attachControl'],
         },
         universal: {
@@ -92,21 +130,6 @@ b3d.cameraDataModel = {
                 this.ref.lockedTarget = null;
             }
         },
-    },
-};
-
-b3d.cameraPresets = {
-    defaultCamera: {
-        name: 'defaultCamera',
-        type: 'arc',
-        fov: 0.9,
-        inertia: 0.8,
-        target: {x:8, z: 8, y: 3},
-        alpha: Math.PI,
-        beta: 0,
-        radius: 10,
-        attachControl: false,
-        followAvatar: true,
     },
 };
 
@@ -287,7 +310,7 @@ b3d.parseDataFromDialog = function () {
 
 b3d.loadCamerasFromData = function (parsedCameras) {
     if (!parsedCameras || parsedCameras.length < 1) {
-        b3d.cameras.push(b3d.createCamera(b3d.cameraPresets.defaultCamera));
+        b3d.cameras.push(b3d.createCamera(b3d.cameraPresets[b3d.defaultCameraPreset]));
     } else {
         b3d.cameras = parsedCameras.map(function (camData) {
             return b3d.createCamera(camData);
@@ -527,7 +550,8 @@ b3d.serializeDataAsDialog = function () {
 
     var result = JSON.stringify({
         // options: b3d.options,
-        cameras: b3d.cameras,
+        // turn off camera serizlization for now for easier testing
+        // cameras: b3d.cameras,
         mesh: meshSerialized,
         stack: stackSerialized
     }, null, 2);
