@@ -310,7 +310,11 @@ b3d.parseDataFromDialog = function () {
     // }
 
     // load cameras from serialized data
-    b3d.loadCamerasFromData(parsed.cameras);
+    if (parsed && parsed.cameras) {
+        b3d.loadCamerasFromData(parsed.cameras);
+    } else {
+        b3d.loadCamerasFromData();
+    }
 
     return Boolean(serialized);
 };
