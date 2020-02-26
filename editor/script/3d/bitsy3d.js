@@ -59,6 +59,7 @@ var b3d = {
     },
 
     dialogDirty: false,
+    rawDirection: bitsy.Direction.None,
 
     defaultCameraPreset: 'free first person',
 };
@@ -151,6 +152,35 @@ document.addEventListener('DOMContentLoaded', function() {
             b3d.render();
         });
     }
+
+    // adjust movement direction relative to the camera
+    b3d.patch(bitsy, 'movePlayer',
+        function () {
+            var rotationTable = {};
+            rotationTable[bitsy.Direction.Up] = bitsy.Direction.Left;
+            rotationTable[bitsy.Direction.Left] = bitsy.Direction.Down;
+            rotationTable[bitsy.Direction.Down] = bitsy.Direction.Right;
+            rotationTable[bitsy.Direction.Right] = bitsy.Direction.Up;
+            rotationTable[bitsy.Direction.None] = bitsy.Direction.None;
+
+            b3d.rawDirection = bitsy.curPlayerDirection;
+
+            var rotatedDirection = bitsy.curPlayerDirection;
+            var ray = b3d.scene.activeCamera.getForwardRay().direction;
+            var ray2 = new BABYLON.Vector2(ray.x, ray.z);
+            ray2.normalize();
+            var a = (Math.atan2(ray2.y, ray2.x) / Math.PI + 1) * 2 + 0.5;
+            if (a < 0) {
+                a += 4;
+            }
+            for (var i = 0; i < a; ++i) {
+                rotatedDirection = rotationTable[rotatedDirection];
+            }
+            bitsy.curPlayerDirection = rotatedDirection;
+        },
+        function () {
+            bitsy.curPlayerDirection = b3d.rawDirection;
+    });
 });
 
 // helper function to patch functions
