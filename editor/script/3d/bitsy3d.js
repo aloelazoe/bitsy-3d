@@ -54,7 +54,8 @@ var b3d = {
     spriteLastPos: {},
     tweens: {},
     tweenFunction: function (t) {
-        t = 1 - ((1 - t) ** 2);
+        // todo: add tweening function presets
+        // t = 1 - ((1 - t) ** 2);
         return t;
     },
 
