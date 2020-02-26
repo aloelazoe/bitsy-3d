@@ -13,6 +13,9 @@ var b3d = {
 
         tweenDistance: 1.5,
         tweenDuration: 150,
+
+        holdToMoveInterval: 150,
+        secondStepInterval: 150,
     },
 
     cameras: [],
@@ -226,6 +229,10 @@ b3d.init = function () {
     // create transform node that will copy avatar's position
     // prevents crashes when used as a camera target when avatar mesh is a billboard
     b3d.avatarNode = new BABYLON.TransformNode('avatarNode');
+
+    // apply options
+    bitsy.playerHoldToMoveInterval = b3d.options.holdToMoveInterval;
+    bitsy.playerSecondStepInterval = b3d.options.secondStepInterval;
 
     // initialize the following objects by parsing serialized data:
     // * b3d.meshConfig
