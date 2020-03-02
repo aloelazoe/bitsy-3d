@@ -1,7 +1,7 @@
 var bitsy = window;
 
 var b3d = {
-    options: {
+    settings: {
         engineWidth: 512,
         engineHeight: 512,
         engineAutoResize: true,
@@ -232,9 +232,9 @@ b3d.init = function () {
 
     // set engine size. these dimensions can be different from the canvas dimensions
     // but if canvas doesn't have set dimensions, they will be set to these and will remain fixed
-    b3d.engine.setSize(b3d.options.engineWidth, b3d.options.engineHeight);
+    b3d.engine.setSize(b3d.settings.engineWidth, b3d.settings.engineHeight);
     // watch for browser/canvas resize events
-    if (b3d.options.engineAutoResize) {
+    if (b3d.settings.engineAutoResize) {
         // resize engine according to the canvas size
         b3d.engine.resize();
         window.addEventListener("resize", function () {
@@ -261,9 +261,9 @@ b3d.init = function () {
     // prevents crashes when used as a camera target when avatar mesh is a billboard
     b3d.avatarNode = new BABYLON.TransformNode('avatarNode');
 
-    // apply options
-    bitsy.playerHoldToMoveInterval = b3d.options.holdToMoveInterval;
-    bitsy.playerSecondStepInterval = b3d.options.secondStepInterval;
+    // apply settings
+    bitsy.playerHoldToMoveInterval = b3d.settings.holdToMoveInterval;
+    bitsy.playerSecondStepInterval = b3d.settings.secondStepInterval;
 
     // initialize the following objects by parsing serialized data:
     // * b3d.meshConfig
@@ -336,8 +336,8 @@ b3d.parseDataFromDialog = function () {
         });
     }
 
-    // if (parsed && parsed.options) {
-    //     b3d.options = parsed.options;
+    // if (parsed && parsed.settings) {
+    //     b3d.settings = parsed.settings;
     // }
 
     // load cameras from serialized data
@@ -591,7 +591,7 @@ b3d.serializeDataAsDialog = function () {
     // });
 
     var result = JSON.stringify({
-        // options: b3d.options,
+        // settings: b3d.settings,
         // turn off camera serizlization for now for easier testing
         // cameras: b3d.cameras,
         mesh: meshSerialized,
@@ -948,7 +948,7 @@ b3d.update = function () {
             b3d.spriteLastPos[id] = b3d.spriteLastPos[id] || new BABYLON.Vector3(targetX, targetY, targetZ);
             var lastPos = b3d.spriteLastPos[id];
 
-            if (!editorMode && !lastPos.equalsToFloats(targetX, targetY, targetZ) && lastPos.subtractFromFloats(targetX, targetY, targetZ).length() <= b3d.options.tweenDistance) {
+            if (!editorMode && !lastPos.equalsToFloats(targetX, targetY, targetZ) && lastPos.subtractFromFloats(targetX, targetY, targetZ).length() <= b3d.settings.tweenDistance) {
                 // add a tween
                 b3d.tweens[id] = {
                     from: lastPos.clone(),
@@ -993,7 +993,7 @@ b3d.update = function () {
         Object.entries(b3d.tweens).forEach(function (entry) {
             var id = entry[0];
             var tween = entry[1];
-            var t = (bitsy.prevTime - tween.start) / b3d.options.tweenDuration;
+            var t = (bitsy.prevTime - tween.start) / b3d.settings.tweenDuration;
             if (t < 1) {
                 BABYLON.Vector3.LerpToRef(
                     tween.from,
@@ -1094,8 +1094,8 @@ b3d.update = function () {
     });
 
     // bg changes
-    b3d.scene.clearColor = b3d.getColor(b3d.options.clearColor);
-    b3d.scene.fogColor = b3d.getColor(b3d.options.fogColor);
+    b3d.scene.clearColor = b3d.getColor(b3d.settings.clearColor);
+    b3d.scene.fogColor = b3d.getColor(b3d.settings.fogColor);
 
     b3d.lastStack = b3d.curStack;
     b3d.lastRoom = bitsy.curRoom;
