@@ -340,85 +340,148 @@
 						</div>
 					</div>
 
-					<div id="meshBaseName" class="controlBox">
-						<p style="margin: 5px">type id: name</p>
-					</div>
-
-					<form style="margin-bottom:5px;">
-						<input type="radio" name="mesh tab" value="base" onclick="meshPanel.onTabBase();" id="meshTabBase" checked>
-						<label title="configure the mesh" for="meshTabBase" class="left">
-							<span>base</span>
+					<form>
+						<input type="radio" name="3d settings tabs" value="mesh" onclick="meshPanel.onTabMesh();" id="settings3dTabMesh" checked>
+						<label title="configure the mesh" for="settings3dTabMesh" class="left">
+							<i class="material-icons">brush</i>
+							<span>mesh</span>
 						</label>
-						<input type="radio" name="mesh tab" value="children" onclick="meshPanel.onTabChildren();" id="meshTabChildren">
-						<label title="add child meshes to combine this object with others" for="meshTabChildren" class="right">
-							<span>children</span>
+						<input type="radio" name="3d settings tabs" value="camera" onclick="meshPanel.onTabCamera();" id="settings3dTabCamera">
+						<label title="configure the camera" for="settings3dTabCamera" class="middle">
+							<i class="material-icons">videocam</i>
+							<span>camera</span>
+						</label>
+						<input type="radio" name="3d settings tabs" value="game" onclick="meshPanel.onTabGame();" id="settings3dTabGame">
+						<label title="game settings" for="settings3dTabGame" class="right">
+							<i class="material-icons">settings</i>
+							<span>game</span>
 						</label>
 					</form>
 
-					<form id="meshChildrenList" style="display:none; margin-top:5px; margin-bottom:5px;">
-						<!-- <div>
-							<input type="radio" name="children list" value="childMeshExample" onclick="meshPanel.selectChild(event);" id="childMeshExample" checked>
-							<label for="childMeshExample">
-								<span>childMeshExample</span>
+					<div id="settings3dMesh">
+						<div id="meshBaseName" class="controlBox" style="margin-top: 8px">
+							<p>type id: name</p>
+						</div>
+
+						<form style="margin-bottom:5px;">
+							<input type="radio" name="mesh tab" value="base" onclick="meshPanel.onTabBase();" id="meshTabBase" checked>
+							<label title="configure the mesh" for="meshTabBase" class="left">
+								<span>base</span>
 							</label>
-						</div> -->
-						<!-- children elements are added dynamically -->
-
-						<div id="meshAddChildButton" style="display:none; margin-top:2px; margin-bottom:7px;">
-							<input type="radio" name="children list" value="new" onclick="meshPanel.onAddChildButton(event);" id="addChildButtonInput">
-							<label for="addChildButtonInput" title="add another mesh as a 'child' object which will be positioned relative to this one, its 'parent'">
-								<i class="material-icons">add</i>
+							<input type="radio" name="mesh tab" value="children" onclick="meshPanel.onTabChildren();" id="meshTabChildren">
+							<label title="add child meshes to combine this object with others" for="meshTabChildren" class="right">
+								<span>children</span>
 							</label>
-						</div>
-					</form>
+						</form>
 
-					<div id="meshAddChildArea" class="controlBox" ondrop="meshPanel.addChildDropHandler(event)" ondragover="meshPanel.addChildDragoverHandler(event)" style="display:none; margin-top:5px;">
-						<p style="margin: 20px">drag and drop a drawing from<br>"find drawing" panel<br>to add it as a child mesh</p>
-					</div>
+						<form id="meshChildrenList" style="display:none; margin-top:5px; margin-bottom:5px;">
+							<!-- <div>
+								<input type="radio" name="children list" value="childMeshExample" onclick="meshPanel.selectChild(event);" id="childMeshExample" checked>
+								<label for="childMeshExample">
+									<span>childMeshExample</span>
+								</label>
+							</div> -->
+							<!-- children elements are added dynamically -->
 
-					<div id="meshConfig" class="controlBox" style="width: 256px">
-						<div id="meshType" title="model to use for displaying currently selected bitsy drawing in 3d">
-							<span>type</span>:
-							<select id="meshTypeSelect" onchange="meshPanel.onChangeType();">
-								<!-- options are added dynamically -->
-							</select>
-							<select title="select subtype" id="meshSubTypeSelect" onchange="meshPanel.onChangeType();">
-								<!-- options are added dynamically -->
-							</select>
-						</div>
-						<div id="meshTransparency" title="check if background color on this mesh should be made transparent">
-							<label for="meshTransparencyCheck">transparency</label>:
-							<input type="checkbox" id="meshTransparencyCheck" style="display:initial" onchange="meshPanel.onChangeTransparency();">
+							<div id="meshAddChildButton" style="display:none; margin-top:2px; margin-bottom:7px;">
+								<input type="radio" name="children list" value="new" onclick="meshPanel.onAddChildButton(event);" id="addChildButtonInput">
+								<label for="addChildButtonInput" title="add another mesh as a 'child' object which will be positioned relative to this one, its 'parent'">
+									<i class="material-icons">add</i>
+								</label>
+							</div>
+						</form>
+
+						<div id="meshAddChildArea" class="controlBox" ondrop="meshPanel.addChildDropHandler(event)" ondragover="meshPanel.addChildDragoverHandler(event)" style="display:none; margin-top:5px;">
+							<p style="margin: 20px">drag and drop a drawing from<br>"find drawing" panel<br>to add it as a child mesh</p>
 						</div>
 
-						<input type="checkbox" id="transformCheck" onclick="meshPanel.onToggleTransform();" />
-						<label title="translation (offset), rotation and scale settings" for="transformCheck">
-							<span>transform</span>
-							<i id="transformCheckIcon" class="material-icons">expand_less</i>
+						<div id="meshConfig" class="controlBox" style="width: 256px">
+							<div id="meshType" title="model to use for displaying currently selected bitsy drawing in 3d">
+								<span>type</span>:
+								<select id="meshTypeSelect" onchange="meshPanel.onChangeType();">
+									<!-- options are added dynamically -->
+								</select>
+								<select title="select subtype" id="meshSubTypeSelect" onchange="meshPanel.onChangeType();">
+									<!-- options are added dynamically -->
+								</select>
+							</div>
+							<div id="meshTransparency" title="check if background color on this mesh should be made transparent">
+								<label for="meshTransparencyCheck">transparency</label>:
+								<input type="checkbox" id="meshTransparencyCheck" style="display:initial" onchange="meshPanel.onChangeTransparency();">
+							</div>
+
+							<input type="checkbox" id="transformCheck" onclick="meshPanel.onToggleTransform();" />
+							<label title="translation (offset), rotation and scale settings" for="transformCheck">
+								<span>transform</span>
+								<i id="transformCheckIcon" class="material-icons">expand_less</i>
+							</label>
+
+							<div id="transform" style="display:none;">
+								<div id="transformTranslation">
+									<i class="material-icons" title="translation (offset)" style="vertical-align:middle">swap_horiz</i>
+									<input type="text" id="transformTranslationX" title="translation on x axis" size="7" value="0">
+									<input type="text" id="transformTranslationY" title="translation on y axis" size="7" value="0">
+									<input type="text" id="transformTranslationZ" title="translation on z axis" size="7" value="0">
+								</div>
+								<div id="transformRotation">
+									<i class="material-icons" title="rotation" style="vertical-align:middle">rotate_right</i>
+									<input type="text" id="transformRotationX" title="rotation in degrees around x axis" size="7" value="0">
+									<input type="text" id="transformRotationY" title="rotation in degrees around y axis" size="7" value="0">
+									<input type="text" id="transformRotationZ" title="rotation in degrees around z axis" size="7" value="0">
+								</div>
+								<div id="transformScale">
+									<i class="material-icons" title="scale" style="vertical-align:middle">zoom_out_map</i>
+									<input type="text" id="transformScaleX" title="scale on x axis" size="7" value="1">
+									<input type="text" id="transformScaleY" title="scale on y axis" size="7" value="1">
+									<input type="text" id="transformScaleZ" title="scale on z axis" size="7" value="1">
+								</div>
+							</div>
+						</div>
+					</div> <!-- settings3dMesh -->
+
+					<div id="settings3dCamera" class="controlBox" style="display: none; margin-top: 8px;">
+						<form id="settings3dCameraList" style="margin-top:5px; margin-bottom:5px;">
+							<!-- <div>
+								<input type="radio" name="camera list" value="camera" onclick="meshPanel.selectChild(event);" id="childMeshExample" checked>
+								<label for="childMeshExample">
+									<span>childMeshExample</span>
+								</label>
+							</div> -->
+							<!-- children elements are added dynamically -->
+
+							<!-- <div id="addCameraButton" style="margin-top:2px; margin-bottom:7px;">
+								<input type="radio" name="camera list" value="new" id="addCameraButtonInput">
+								<label for="addCameraButtonInput" title="add a new camera">
+									<i class="material-icons">add</i>
+								</label>
+							</div> -->
+						</form>
+						<label for="settings3dCameraPreset">preset: </label>
+						<select id="settings3dCameraPreset" onchange="meshPanel.onChangeCameraPreset(event);">
+							<option value="custom" id="customCameraPresetOption">custom</option>
+							<!-- generate other options dynamically -->
+						</select>
+						<br>
+						<input type="checkbox" id="settings3dCameraAdvancedCheck" onclick="meshPanel.toggleAdvancedCameraSettings(event);">
+						<label title="show / hide advanced camera settings" for="settings3dCameraAdvancedCheck">
+							<span>advanced camera settings</span>
+							<i id="cameraAdvancedSettingsCheckIcon" class="material-icons">expand_less</i>
 						</label>
-
-						<div id="transform" style="display:none;">
-							<div id="transformTranslation">
-								<i class="material-icons" title="translation (offset)" style="vertical-align:middle">swap_horiz</i>
-								<input type="text" id="transformTranslationX" title="translation on x axis" size="7" value="0">
-								<input type="text" id="transformTranslationY" title="translation on y axis" size="7" value="0">
-								<input type="text" id="transformTranslationZ" title="translation on z axis" size="7" value="0">
-							</div>
-							<div id="transformRotation">
-								<i class="material-icons" title="rotation" style="vertical-align:middle">rotate_right</i>
-								<input type="text" id="transformRotationX" title="rotation in degrees around x axis" size="7" value="0">
-								<input type="text" id="transformRotationY" title="rotation in degrees around y axis" size="7" value="0">
-								<input type="text" id="transformRotationZ" title="rotation in degrees around z axis" size="7" value="0">
-							</div>
-							<div id="transformScale">
-								<i class="material-icons" title="scale" style="vertical-align:middle">zoom_out_map</i>
-								<input type="text" id="transformScaleX" title="scale on x axis" size="7" value="1">
-								<input type="text" id="transformScaleY" title="scale on y axis" size="7" value="1">
-								<input type="text" id="transformScaleZ" title="scale on z axis" size="7" value="1">
-							</div>
+						<br>
+						<div id="settings3dCameraAdvanced" style="display:none;">
+							<label for="settings3dCameraType">type: </label>
+							<select id="settings3dCameraType">
+								<!-- generate options dynamically -->
+							</select>
 						</div>
+
 					</div>
-				</div>
+
+					<div id="settings3dGame" class="controlBox" style="display: none; margin-top: 8px;">
+						<!-- todo: add reset button -->
+					</div>
+
+				</div> <!-- meshPanel -->
 
 				<div id="roomPanel" class="panel">
 					<div class="bar">

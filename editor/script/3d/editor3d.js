@@ -834,6 +834,10 @@ var meshPanel = {
     transformInputEls: [],
     transformValidatedNumbers: [1,1,1, 0,0,0, 0,0,0],
 
+    curCameraPreset: null,
+    // current camera index in b3d.cameras array
+    curCameraIndex: 0,
+
     init: function() {
         meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
         meshPanel.subTypeSelectEl = document.getElementById('meshSubTypeSelect');
@@ -881,6 +885,11 @@ var meshPanel = {
         meshPanel.updateSelection();
 
         meshPanel.onToggleTransform();
+
+        meshPanel.initCameraSettings();
+        meshPanel.initGameSettings();
+
+        meshPanel.onTabMesh();
     },
 
     // update widgets. they will reflect meshPanel.curDrw
@@ -890,8 +899,41 @@ var meshPanel = {
         meshPanel.updateTransform();
     },
 
+    onTabMesh: function() {
+        // make sure the correct tab is checked
+        document.getElementById('settings3dTabMesh').checked = true;
+
+        console.log('select mesh tab');
+
+        document.getElementById('settings3dMesh').style.display = 'block';
+        document.getElementById('settings3dCamera').style.display = 'none';
+        document.getElementById('settings3dGame').style.display = 'none';
+    },
+
+    onTabCamera: function() {
+        // make sure the correct tab is checked
+        document.getElementById('settings3dTabCamera').checked = true;
+
+        console.log('select camera tab');
+
+        document.getElementById('settings3dMesh').style.display = 'none';
+        document.getElementById('settings3dCamera').style.display = 'block';
+        document.getElementById('settings3dGame').style.display = 'none';
+    },
+
+    onTabGame: function() {
+        // make sure the correct tab is checked
+        document.getElementById('settings3dTabGame').checked = true;
+
+        console.log('select game tab');
+
+        document.getElementById('settings3dCamera').style.display = 'none';
+        document.getElementById('settings3dMesh').style.display = 'none';
+        document.getElementById('settings3dGame').style.display = 'block';
+    },
+
     onTabBase: function() {
-        // make sure the right tab is always checked
+        // make sure the correct tab is checked
         document.getElementById('meshTabBase').checked = true;
 
         document.getElementById('meshChildrenList').style.display = 'none';
@@ -908,7 +950,7 @@ var meshPanel = {
     },
 
     onTabChildren: function() {
-        // make sure the right tab is always checked
+        // make sure the correct tab is checked
         document.getElementById('meshTabChildren').checked = true;
 
         meshPanel.updateChildrenList();
@@ -1081,10 +1123,10 @@ var meshPanel = {
             var suffix = type.slice(prefix.length);
             Array.prototype.find.call(meshPanel.typeSelectEl.options, function(o) {return o.value === prefix}).selected = true;
             Array.prototype.find.call(meshPanel.subTypeSelectEl.options, function(o) {return o.value === suffix}).selected = true;
-            meshPanel.subTypeSelectEl.setAttribute('style', 'display:initial;');
+            meshPanel.subTypeSelectEl.style.display = 'initial';
         } else {
             Array.prototype.find.call(meshPanel.typeSelectEl.options, function(o) {return o.value === type}).selected = true;
-            meshPanel.subTypeSelectEl.setAttribute('style', 'display:none;');
+            meshPanel.subTypeSelectEl.style.display = 'none';
         }
     },
 
@@ -1093,10 +1135,10 @@ var meshPanel = {
 
         meshPanel.subTypePrefixes.forEach(function(p) {
             if (curMeshType.startsWith(p)) {
-                meshPanel.subTypeSelectEl.setAttribute('style', 'display:initial;');
+                meshPanel.subTypeSelectEl.style.display = 'initial';
                 curMeshType += meshPanel.subTypeSelectEl.value;
             } else {
-                meshPanel.subTypeSelectEl.setAttribute('style', 'display:none;');
+                meshPanel.subTypeSelectEl.style.display = 'none';
             }
         });
 
@@ -1193,5 +1235,94 @@ var meshPanel = {
         event.preventDefault();
         event.dataTransfer.dropEffect = "link";
         console.log('addChildDragoverHandler');
+    },
+
+
+    // generate ui for configuring 3d game settings
+    initGameSettings: function () {
+        Object.entries(b3d.settings).forEach(function (entry) {
+            var key = entry[0];
+            var value = entry[1];
+
+            var divEl = document.createElement('div');
+            var labelEl = document.createElement('label');
+            var inputEl = document.createElement('input');
+
+            document.getElementById('settings3dGame').appendChild(divEl);
+            divEl.appendChild(labelEl);
+            divEl.appendChild(inputEl);
+
+            labelEl.innerHTML = key.replace(/([A-Z])/g, " $1" ).toLowerCase() + ': ';
+
+            inputEl.value = value;
+            switch (typeof value) {
+                case 'number':
+                    // inputEl.type = 'number';
+                    // inputEl.step = 0.0001;
+                    inputEl.addEventListener('input', function (evt) {
+                        console.log(key + ' was changed');
+                    });
+                    break;
+                case 'boolean':
+                    inputEl.type = 'checkbox';
+                    inputEl.style.display = 'inline';
+                    inputEl.addEventListener('input', function (evt) {
+                        console.log(key + ' was changed');
+                    });
+                    break;
+            }
+        });
+    },
+
+    toggleAdvancedCameraSettings: function (event) {
+        if (document.getElementById('settings3dCameraAdvancedCheck').checked) {
+            document.getElementById('settings3dCameraAdvanced').style.display = 'block';
+            document.getElementById("cameraAdvancedSettingsCheckIcon").innerHTML = "expand_more";
+        } else {
+            document.getElementById('settings3dCameraAdvanced').style.display = 'none';
+            document.getElementById("cameraAdvancedSettingsCheckIcon").innerHTML = "expand_less";
+        }
+    },
+
+    initCameraSettings: function () {
+        // generate option element for each preset
+        Object.keys(b3d.cameraPresets).forEach(function(presetName) {
+            var option = document.createElement('option');
+            option.text = option.value = presetName;
+            document.getElementById('settings3dCameraPreset').add(option);
+            // todo: select the correct camera preset option 
+            if (b3d.defaultCameraPreset === presetName) {
+                option.selected = true;
+                meshPanel.curCameraPreset = presetName;
+            }
+        });
+        // todo: perhaps only add 'custom' option dynamically, when you modify one of the presets
+    },
+
+    onChangeCameraPreset: function (event) {
+        var newPresetValue = document.getElementById('settings3dCameraPreset').value;
+        console.log('selected camera preset: ' + newPresetValue);
+
+        // todo: ask for confirmation if the current preset was the custom one
+        if (meshPanel.curCameraPreset === 'custom' && !window.confirm('if you select a different preset, it will overwrite your custom camera configuration. are you sure you want to select a different preset?')) {
+            document.getElementById('settings3dCameraPreset').value = 'custom';
+            return;
+        }
+
+        meshPanel.curCameraPreset = newPresetValue;
+
+        if (newPresetValue === 'custom') {
+            return;
+        }
+
+        // create a new camera object from selected preset and replace the previous one
+        var newCamera = b3d.createCamera(b3d.cameraPresets[newPresetValue]);
+        // if we are play mode and have the current camera selected, set the new camera as active before deleting the previous one
+        if (b3d.scene.activeCamera === b3d.cameras[meshPanel.curCameraIndex].ref) {
+            newCamera.setActive();
+        }
+        b3d.cameras[meshPanel.curCameraIndex].ref.dispose();
+        delete b3d.cameras[meshPanel.curCameraIndex];
+        b3d.cameras[meshPanel.curCameraIndex] = newCamera;
     },
 }; // meshPanel
