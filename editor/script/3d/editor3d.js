@@ -55,21 +55,22 @@ editor3d.init = function() {
 
     editor3d.suggestReplacingNameTags();
 
-    // create and select editor camera
-    editor3d.camera = new BABYLON.ArcRotateCamera("EditorCamera", Math.PI / 2, Math.PI / 2, 15, new BABYLON.Vector3(8,0,8), b3d.scene);
-    // perspective clipping
-    editor3d.camera.position = new BABYLON.Vector3(7.5,10,-16);
-    editor3d.camera.minZ = 0.001;
-    editor3d.camera.maxZ = bitsy.mapsize * 5;
-    // zoom
-    editor3d.camera.wheelPrecision = bitsy.mapsize;
-    editor3d.camera.upperRadiusLimit = 30;
-    editor3d.camera.lowerRadiusLimit = 1;
-
-    editor3d.camera.upperBetaLimit = Math.PI / 2;
-
-    editor3d.camera.attachControl(b3d.sceneCanvas);
-    b3d.scene.activeCamera = editor3d.camera;
+    editor3d.camera = b3d.createCamera({
+        type: 'arc',
+        name: 'EditorCamera',
+        alpha: Math.PI * 1.5,
+        beta: Math.PI / 3,
+        radius: 26,
+        target: {x:8, y:0, z:8},
+        minZ: 0.001,
+        maxZ: bitsy.mapsize * 5,
+        wheelPrecision: bitsy.mapsize,
+        upperRadiusLimit: 30,
+        lowerRadiusLimit: 1,
+        upperBetaLimit: Math.PI / 2,
+        attachControl: true,
+    });
+    editor3d.camera.setActive();
 
     // make a mesh for 3d cursor
     editor3d.cursor.mesh = BABYLON.MeshBuilder.CreateBox('cursor', { size: 1.1 }, b3d.scene);
@@ -197,7 +198,7 @@ editor3d.init = function() {
         b3d.parseData();
 
         // set editor camera as active again
-        b3d.scene.activeCamera = editor3d.camera;
+        editor3d.camera.setActive();
 
         editor3d.suggestReplacingNameTags();
         // clear all caches to force all drawings to reset during the update
@@ -251,7 +252,7 @@ editor3d.init = function() {
     });
 
     b3d.patch(bitsy, 'on_edit_mode', null, function () {
-        b3d.scene.activeCamera = editor3d.camera;
+        editor3d.camera.setActive();
     });
 
     // change the behavior of 'find drawing' panel to allow viewing drawings

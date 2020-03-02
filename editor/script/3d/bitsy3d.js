@@ -110,7 +110,7 @@ b3d.cameraDataModel = {
     cameraTypes: {
         arc: {
             class: BABYLON.ArcRotateCamera,
-            value: ['alpha', 'beta', 'radius', 'lowerRadiusLimit', 'upperRadiusLimit'],
+            value: ['alpha', 'beta', 'radius', 'lowerRadiusLimit', 'upperRadiusLimit', 'wheelPrecision', 'upperBetaLimit', 'lowerBetaLimit'],
             trait: ['attachControl'],
         },
         universal: {
