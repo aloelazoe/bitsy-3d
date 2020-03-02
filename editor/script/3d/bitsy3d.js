@@ -2,6 +2,8 @@ var bitsy = window;
 
 var b3d = {
     settings: {
+        defaultCameraIndex: 0,
+        
         engineWidth: 512,
         engineHeight: 512,
         engineAutoResize: true,
@@ -358,8 +360,8 @@ b3d.loadCamerasFromData = function (parsedCameras) {
             return b3d.createCamera(camData);
         });
     }
-    // todo: choose what camera should be active by default according to options
-    b3d.cameras[0].setActive();
+    var idx = b3d.settings.defaultCameraIndex < b3d.cameras.length ? b3d.settings.defaultCameraIndex : 0;
+    b3d.cameras[idx].setActive();
 };
 
 // create a camera from serialized data
@@ -454,7 +456,9 @@ b3d.createCamera = function (camData) {
 
     // define methods
     camera.setActive = function () {
+        if (b3d.scene.activeCamera) b3d.scene.activeCamera.detachControl(b3d.sceneCanvas);
         b3d.scene.activeCamera = this.ref;
+        if (this.attachControl) this.ref.attachControl(b3d.sceneCanvas);
     };
 
     return camera;
