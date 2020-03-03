@@ -269,18 +269,6 @@ b3d.init = function () {
     b3d.scene.ambientColor = new BABYLON.Color3(1, 1, 1);
     b3d.scene.freezeActiveMeshes();
 
-    // set engine size. these dimensions can be different from the canvas dimensions
-    // but if canvas doesn't have set dimensions, they will be set to these and will remain fixed
-    b3d.engine.setSize(b3d.settings.engineWidth, b3d.settings.engineHeight);
-    // watch for browser/canvas resize events
-    if (b3d.settings.engineAutoResize) {
-        // resize engine according to the canvas size
-        b3d.engine.resize();
-        window.addEventListener("resize", function () {
-            b3d.engine.resize();
-        });
-    }
-
     // set up text canvas
     b3d.textCanvas.width = bitsy.canvas.width;
     b3d.textCanvas.height = bitsy.canvas.height;
@@ -300,16 +288,18 @@ b3d.init = function () {
     // prevents crashes when used as a camera target when avatar mesh is a billboard
     b3d.avatarNode = new BABYLON.TransformNode('avatarNode');
 
-    // apply settings
-    bitsy.playerHoldToMoveInterval = b3d.settings.movementHoldInterval;
-    bitsy.playerSecondStepInterval = b3d.settings.movementSecondStepInterval;
-
     // initialize the following objects by parsing serialized data:
     // * b3d.meshConfig
     // * b3d.roomsInStack
     // * b3d.stackPosOfRoom
     // * b3d.camera
+    // * b3d.settings
     b3d.parseData();
+
+    // watch for browser/canvas resize events
+    window.addEventListener("resize", function () {
+        if (b3d.settings.engineAutoResize) b3d.engine.resize();
+    });
 };
 
 b3d.parseData = function () {
@@ -375,9 +365,14 @@ b3d.parseDataFromDialog = function () {
         });
     }
 
-    // if (parsed && parsed.settings) {
-    //     b3d.settings = parsed.settings;
-    // }
+    if (parsed && parsed.settings) {
+        Object.keys(b3d.settings).forEach(function (key) {
+            if (parsed.settings[key] !== null && parsed.settings[key] !== undefined) {
+                b3d.settings[key] = parsed.settings[key];
+            }
+        });
+    }
+    b3d.applySettings();
 
     // load camera from serialized data or create a default camera
     if (parsed && parsed.camera) {
@@ -388,6 +383,19 @@ b3d.parseDataFromDialog = function () {
     b3d.mainCamera.activate();
 
     return Boolean(serialized);
+};
+
+b3d.applySettings = function () {
+    bitsy.playerHoldToMoveInterval = b3d.settings.movementHoldInterval;
+    bitsy.playerSecondStepInterval = b3d.settings.movementSecondStepInterval;
+
+    // set engine size. these dimensions can be different from the canvas dimensions
+    // but if canvas doesn't have set dimensions, they will be set to these and will remain fixed
+    b3d.engine.setSize(b3d.settings.engineWidth, b3d.settings.engineHeight);
+    if (b3d.settings.engineAutoResize) {
+        // resize engine according to the canvas size
+        b3d.engine.resize();
+    }
 };
 
 // create a camera from serialized data
@@ -636,9 +644,8 @@ b3d.serializeDataAsDialog = function () {
     });
 
     var result = JSON.stringify({
-        // settings: b3d.settings,
-        // turn off camera serizlization for now for easier testing
-        // camera: b3d.mainCamera,
+        camera: b3d.mainCamera,
+        settings: b3d.settings,
         mesh: meshSerialized,
         stack: stackSerialized
     }, null, 2);
