@@ -945,20 +945,27 @@ b3d.update = function () {
             mesh.bitsyOrigin.y = s.y;
             mesh.bitsyOrigin.roomId = s.room;
 
-            var targetX = mesh.position.x = s.x;
-            var targetZ = mesh.position.z = bitsy.mapsize - 1 - s.y;
-            var targetY = mesh.position.y = b3d.curStack && b3d.stackPosOfRoom[s.room].pos || 0;
+            var targetX = s.x;
+            var targetZ = bitsy.mapsize - 1 - s.y;
+            var targetY = b3d.curStack && b3d.stackPosOfRoom[s.room].pos || 0;
 
             b3d.spriteLastPos[id] = b3d.spriteLastPos[id] || new BABYLON.Vector3(targetX, targetY, targetZ);
             var lastPos = b3d.spriteLastPos[id];
 
-            if (!editorMode && !lastPos.equalsToFloats(targetX, targetY, targetZ) && lastPos.subtractFromFloats(targetX, targetY, targetZ).length() <= b3d.settings.tweenDistance) {
-                // add a tween
+            if (!editorMode &&
+                !lastPos.equalsToFloats(targetX, targetY, targetZ) && 
+                lastPos.subtractFromFloats(targetX, targetY, targetZ).length() <= b3d.settings.tweenDistance) {
+                // add a tween from current position
                 b3d.tweens[id] = {
-                    from: lastPos.clone(),
+                    from: mesh.position.clone(),
                     to: new BABYLON.Vector3(targetX, targetY, targetZ),
                     start: bitsy.prevTime,
                 };
+            } else {
+                // otherwise move the sprite immediately
+                mesh.position.x = targetX;
+                mesh.position.z = targetZ;
+                mesh.position.y = targetY;
             }
             // remember current position
             lastPos.copyFromFloats(targetX, targetY, targetZ);
