@@ -21,6 +21,7 @@ var b3d = {
 
     mainCamera: null,
     curActiveCamera: null,
+    curCameraPreset: null,
 
     engine: null,
     scene: null,
@@ -375,9 +376,14 @@ b3d.parseDataFromDialog = function () {
     b3d.applySettings();
 
     // load camera from serialized data or create a default camera
+    // camera can be either a string specifying a preset or an object with custom camera configuration
     if (parsed && parsed.camera) {
-        b3d.mainCamera = b3d.createCamera(parsed.camera);
+        if (typeof parsed.camera === 'string') {
+            b3d.curCameraPreset = b3d.cameraPresets[parsed.camera] ? parsed.camera : b3d.defaultCameraPreset;
+        }
+        b3d.mainCamera = b3d.createCamera(b3d.cameraPresets[b3d.curCameraPreset] || parsed.camera);
     } else {
+        b3d.curCameraPreset = b3d.defaultCameraPreset;
         b3d.mainCamera = b3d.createCamera(b3d.cameraPresets[b3d.defaultCameraPreset]);
     }
     b3d.mainCamera.activate();
@@ -644,7 +650,7 @@ b3d.serializeDataAsDialog = function () {
     });
 
     var result = JSON.stringify({
-        camera: b3d.mainCamera,
+        camera: b3d.curCameraPreset || b3d.mainCamera,
         settings: b3d.settings,
         mesh: meshSerialized,
         stack: stackSerialized

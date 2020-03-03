@@ -835,8 +835,6 @@ var meshPanel = {
     transformInputEls: [],
     transformValidatedNumbers: [1,1,1, 0,0,0, 0,0,0],
 
-    curCameraPreset: null,
-
     init: function() {
         meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
         meshPanel.subTypeSelectEl = document.getElementById('meshSubTypeSelect');
@@ -1236,7 +1234,6 @@ var meshPanel = {
         console.log('addChildDragoverHandler');
     },
 
-
     // generate ui for configuring 3d game settings
     initGameSettings: function () {
         Object.entries(b3d.settings).forEach(function (entry) {
@@ -1290,11 +1287,11 @@ var meshPanel = {
             option.text = option.value = presetName;
             document.getElementById('settings3dCameraPreset').add(option);
             // todo: select the correct camera preset option 
-            if (b3d.defaultCameraPreset === presetName) {
+            if (b3d.curCameraPreset === presetName) {
                 option.selected = true;
-                meshPanel.curCameraPreset = presetName;
             }
         });
+        if (!b3d.curCameraPreset) document.getElementById('settings3dCameraPreset').value = 'custom';
         // todo: perhaps only add 'custom' option dynamically, when you modify one of the presets
     },
 
@@ -1303,24 +1300,27 @@ var meshPanel = {
         console.log('selected camera preset: ' + newPresetValue);
 
         // todo: ask for confirmation if the current preset was the custom one
-        if (meshPanel.curCameraPreset === 'custom' && !window.confirm('if you select a different preset, it will overwrite your custom camera configuration. if you want to save your current camera configuration, you can copy it from game data. are you sure you want to select a different preset?')) {
+        if (!b3d.curCameraPreset && !window.confirm('if you select a different preset, it will overwrite your custom camera configuration. if you want to save your current camera configuration, you can copy it from game data. are you sure you want to select a different preset?')) {
             document.getElementById('settings3dCameraPreset').value = 'custom';
             return;
         }
 
-        meshPanel.curCameraPreset = newPresetValue;
-
         if (newPresetValue === 'custom') {
-            return;
+            b3d.curCameraPreset = null;
+        } else {
+            b3d.curCameraPreset = newPresetValue;
+
+            // create a new camera object from selected preset and replace the previous one
+            var newCamera = b3d.createCamera(b3d.cameraPresets[newPresetValue]);
+            // if we are in play mode and have the current camera selected, set the new camera as active before deleting the previous one
+            if (b3d.scene.activeCamera === b3d.mainCamera.ref) {
+                newCamera.activate();
+            }
+            b3d.mainCamera.ref.dispose();
+            b3d.mainCamera = newCamera;
         }
 
-        // create a new camera object from selected preset and replace the previous one
-        var newCamera = b3d.createCamera(b3d.cameraPresets[newPresetValue]);
-        // if we are in play mode and have the current camera selected, set the new camera as active before deleting the previous one
-        if (b3d.scene.activeCamera === b3d.mainCamera.ref) {
-            newCamera.activate();
-        }
-        b3d.mainCamera.ref.dispose();
-        b3d.mainCamera = newCamera;
+        // todo: account for cases when game data won't be updated because we are in play mode
+        bitsy.refreshGameData();
     },
 }; // meshPanel
