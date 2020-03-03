@@ -83,15 +83,31 @@ b3d.cameraPresets = {
         target: {x:8, z: 8, y: 3},
         alpha: -Math.PI/2,
         beta: Math.PI/3,
-        radius: 14,
-        lowerRadiusLimit: 12,
-        upperRadiusLimit: 18,
+        radius: 6,
+        lowerRadiusLimit: 6,
+        upperRadiusLimit: 6,
+        upperBetaLimit: Math.PI / 2,
         attachControl: true,
         followAvatar: true,
+        lockPointer: true,
     },
-    'fixed position follower': {
+    'fixed target orbiter': {
+        name: 'fixed target orbiter',
+        type: 'arc',
+        fov: 0.9,
+        inertia: 0.8,
+        target: {x:8, z: 8, y: 1.5},
+        alpha: -Math.PI/2,
+        beta: Math.PI/3,
+        radius: 20,
+        lowerRadiusLimit: 20,
+        upperRadiusLimit: 20,
+        upperBetaLimit: Math.PI / 2,
+        attachControl: true,
+    },
+    'fixed position rotating follower': {
         type: 'universal',
-        position: {x: 0, z: 0, y: 18},
+        position: {x: -1, z: 0, y: 3},
         followAvatar: true,
     },
     'free first person': {
@@ -107,6 +123,7 @@ b3d.cameraPresets = {
         maxZ: 100,
         attachControl: true,
         followAvatar: true,
+        lockPointer: true,
     },
 };
 
@@ -114,7 +131,7 @@ b3d.cameraDataModel = {
     commonProperties: {
         value: ['name', 'fov', 'inertia', 'minZ', 'maxZ'],
         vector3: ['target'],
-        trait: ['followAvatar'],
+        trait: ['followAvatar', 'lockPointer'],
     },
     cameraTypes: {
         arc: {
@@ -145,7 +162,21 @@ b3d.cameraDataModel = {
                 this.ref.lockedTarget = null;
             }
         },
+        lockPointer: function (v) {
+            if (v === true) {
+                b3d.sceneCanvas.addEventListener("click", b3d.lockPointer);
+            } else if (v === false) {
+                b3d.sceneCanvas.removeEventListener("click", b3d.lockPointer);
+            }
+        },
     },
+};
+
+b3d.lockPointer = function () {
+    b3d.sceneCanvas.requestPointerLock = b3d.sceneCanvas.requestPointerLock || b3d.sceneCanvas.msRequestPointerLock || b3d.sceneCanvas.mozRequestPointerLock || b3d.sceneCanvas.webkitRequestPointerLock;
+    if (b3d.sceneCanvas.requestPointerLock) {
+        b3d.sceneCanvas.requestPointerLock();
+    }
 };
 
 document.addEventListener('DOMContentLoaded', function() {
