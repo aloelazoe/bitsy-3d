@@ -3,7 +3,7 @@ var bitsy = window;
 var b3d = {
     settings: {
         defaultCameraIndex: 0,
-        
+
         engineWidth: 512,
         engineHeight: 512,
         engineAutoResize: true,
@@ -15,9 +15,10 @@ var b3d = {
 
         tweenDistance: 1.5,
         tweenDuration: 150,
+        tweenFunction: 'linear',
 
-        holdToMoveInterval: 150,
-        secondStepInterval: 150,
+        movementHoldInterval: 150,
+        movementSecondStepInterval: 150,
     },
 
     cameras: [],
@@ -55,11 +56,6 @@ var b3d = {
 
     spriteLastPos: {},
     tweens: {},
-    tweenFunction: function (t) {
-        // todo: add tweening function presets
-        // t = 1 - ((1 - t) ** 2);
-        return t;
-    },
 
     dialogDirty: false,
     rawDirection: bitsy.Direction.None,
@@ -67,9 +63,19 @@ var b3d = {
     defaultCameraPreset: 'free first person',
 };
 
+b3d.tweenFunctions = {
+    'linear': function (t) {
+        return t;
+    },
+    'quadratic': function (t) {
+        t = 1 - ((1 - t) ** 2);
+        return t;
+    },
+};
+
 b3d.cameraPresets = {
-    'orbiter': {
-        name: 'orbiter',
+    'orbiting follower': {
+        name: 'orbiting follower',
         type: 'arc',
         fov: 0.9,
         inertia: 0.8,
@@ -264,8 +270,8 @@ b3d.init = function () {
     b3d.avatarNode = new BABYLON.TransformNode('avatarNode');
 
     // apply settings
-    bitsy.playerHoldToMoveInterval = b3d.settings.holdToMoveInterval;
-    bitsy.playerSecondStepInterval = b3d.settings.secondStepInterval;
+    bitsy.playerHoldToMoveInterval = b3d.settings.movementHoldInterval;
+    bitsy.playerSecondStepInterval = b3d.settings.movementSecondStepInterval;
 
     // initialize the following objects by parsing serialized data:
     // * b3d.meshConfig
@@ -1009,7 +1015,7 @@ b3d.update = function () {
                 BABYLON.Vector3.LerpToRef(
                     tween.from,
                     tween.to,
-                    b3d.tweenFunction(t),
+                    b3d.tweenFunctions[b3d.settings.tweenFunction](t),
                     b3d.sprites[id].position
                 );
             } else {
