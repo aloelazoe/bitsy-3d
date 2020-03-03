@@ -2,8 +2,6 @@ var bitsy = window;
 
 var b3d = {
     settings: {
-        defaultCameraIndex: 0,
-
         engineWidth: 512,
         engineHeight: 512,
         engineAutoResize: true,
@@ -21,7 +19,7 @@ var b3d = {
         movementSecondStepInterval: 150,
     },
 
-    cameras: [],
+    mainCamera: null,
     curActiveCamera: null,
 
     engine: null,
@@ -310,7 +308,7 @@ b3d.init = function () {
     // * b3d.meshConfig
     // * b3d.roomsInStack
     // * b3d.stackPosOfRoom
-    // * b3d.cameras
+    // * b3d.camera
     b3d.parseData();
 };
 
@@ -381,26 +379,15 @@ b3d.parseDataFromDialog = function () {
     //     b3d.settings = parsed.settings;
     // }
 
-    // load cameras from serialized data
-    if (parsed && parsed.cameras) {
-        b3d.loadCamerasFromData(parsed.cameras);
+    // load camera from serialized data or create a default camera
+    if (parsed && parsed.camera) {
+        b3d.mainCamera = b3d.createCamera(parsed.camera);
     } else {
-        b3d.loadCamerasFromData();
+        b3d.mainCamera = b3d.createCamera(b3d.cameraPresets[b3d.defaultCameraPreset]);
     }
+    b3d.mainCamera.activate();
 
     return Boolean(serialized);
-};
-
-b3d.loadCamerasFromData = function (parsedCameras) {
-    if (!parsedCameras || parsedCameras.length < 1) {
-        b3d.cameras.push(b3d.createCamera(b3d.cameraPresets[b3d.defaultCameraPreset]));
-    } else {
-        b3d.cameras = parsedCameras.map(function (camData) {
-            return b3d.createCamera(camData);
-        });
-    }
-    var idx = b3d.settings.defaultCameraIndex < b3d.cameras.length ? b3d.settings.defaultCameraIndex : 0;
-    b3d.cameras[idx].activate();
 };
 
 // create a camera from serialized data
@@ -648,16 +635,10 @@ b3d.serializeDataAsDialog = function () {
         }
     });
 
-
-    // todo: serialize cameras
-    // var camerasSerialized = b3d.cameras.map(function (cam) {
-    //     return b3d.serializeCamera(cam);
-    // });
-
     var result = JSON.stringify({
         // settings: b3d.settings,
         // turn off camera serizlization for now for easier testing
-        // cameras: b3d.cameras,
+        // camera: b3d.mainCamera,
         mesh: meshSerialized,
         stack: stackSerialized
     }, null, 2);

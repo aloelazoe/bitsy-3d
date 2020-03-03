@@ -190,9 +190,10 @@ editor3d.init = function() {
         b3d.stackPosOfRoom = {};
         b3d.meshConfig = {};
 
-        // delete cameras
-        b3d.cameras.forEach(function(c){c.ref.dispose()});
-        b3d.cameras = [];
+        // delete camera
+        b3d.mainCamera.deactivate();
+        b3d.mainCamera.ref.dispose();
+        b3d.mainCamera = null;
 
         // reload data
         b3d.parseData();
@@ -248,7 +249,7 @@ editor3d.init = function() {
     // patch functions that are called when switching play mode on and off
     b3d.patch(bitsy, 'on_play_mode', null, function () {
         // todo: choose what camera should be active by default according to options
-        b3d.cameras[0].activate();
+        b3d.mainCamera.activate();
     });
 
     b3d.patch(bitsy, 'on_edit_mode', null, function () {
@@ -835,8 +836,6 @@ var meshPanel = {
     transformValidatedNumbers: [1,1,1, 0,0,0, 0,0,0],
 
     curCameraPreset: null,
-    // current camera index in b3d.cameras array
-    curCameraIndex: 0,
 
     init: function() {
         meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
@@ -1304,7 +1303,7 @@ var meshPanel = {
         console.log('selected camera preset: ' + newPresetValue);
 
         // todo: ask for confirmation if the current preset was the custom one
-        if (meshPanel.curCameraPreset === 'custom' && !window.confirm('if you select a different preset, it will overwrite your custom camera configuration. are you sure you want to select a different preset?')) {
+        if (meshPanel.curCameraPreset === 'custom' && !window.confirm('if you select a different preset, it will overwrite your custom camera configuration. if you want to save your current camera configuration, you can copy it from game data. are you sure you want to select a different preset?')) {
             document.getElementById('settings3dCameraPreset').value = 'custom';
             return;
         }
@@ -1317,12 +1316,11 @@ var meshPanel = {
 
         // create a new camera object from selected preset and replace the previous one
         var newCamera = b3d.createCamera(b3d.cameraPresets[newPresetValue]);
-        // if we are play mode and have the current camera selected, set the new camera as active before deleting the previous one
-        if (b3d.scene.activeCamera === b3d.cameras[meshPanel.curCameraIndex].ref) {
+        // if we are in play mode and have the current camera selected, set the new camera as active before deleting the previous one
+        if (b3d.scene.activeCamera === b3d.mainCamera.ref) {
             newCamera.activate();
         }
-        b3d.cameras[meshPanel.curCameraIndex].ref.dispose();
-        delete b3d.cameras[meshPanel.curCameraIndex];
-        b3d.cameras[meshPanel.curCameraIndex] = newCamera;
+        b3d.mainCamera.ref.dispose();
+        b3d.mainCamera = newCamera;
     },
 }; // meshPanel
