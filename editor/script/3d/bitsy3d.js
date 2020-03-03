@@ -22,6 +22,7 @@ var b3d = {
     },
 
     cameras: [],
+    curActiveCamera: null,
 
     engine: null,
     scene: null,
@@ -129,6 +130,7 @@ b3d.cameraDataModel = {
     traitEffects: {
         // to be used inside camera trait setters
         // 'this' should refer to camera object
+        // trait effects will be applied every time the camera is activated or deactivated
         attachControl: function (v) {
             if (v === true) {
                 this.ref.attachControl(b3d.sceneCanvas);
@@ -367,7 +369,7 @@ b3d.loadCamerasFromData = function (parsedCameras) {
         });
     }
     var idx = b3d.settings.defaultCameraIndex < b3d.cameras.length ? b3d.settings.defaultCameraIndex : 0;
-    b3d.cameras[idx].setActive();
+    b3d.cameras[idx].activate();
 };
 
 // create a camera from serialized data
@@ -451,8 +453,10 @@ b3d.createCamera = function (camData) {
             get: function () { return traits[t]; },
             set: function (a) {
                 traits[t] = a;
-                // invoke trait effect
-                b3d.cameraDataModel.traitEffects[t].call(this, a);
+                // if camera is currently active, invoke trait effect immediately
+                if (b3d.scene.activeCamera === this.ref) {
+                    b3d.cameraDataModel.traitEffects[t].call(this, a);
+                }
             },
         });
         if (camData[t] !== undefined && camData[t] !== null) {
@@ -461,10 +465,29 @@ b3d.createCamera = function (camData) {
     });
 
     // define methods
-    camera.setActive = function () {
-        if (b3d.scene.activeCamera) b3d.scene.activeCamera.detachControl(b3d.sceneCanvas);
+    camera.activate = function () {
+        if (b3d.curActiveCamera) {
+            b3d.curActiveCamera.deactivate();
+        }
+
+        b3d.curActiveCamera = this;
         b3d.scene.activeCamera = this.ref;
-        if (this.attachControl) this.ref.attachControl(b3d.sceneCanvas);
+
+        // enable trait effects
+        Object.keys(traits).forEach(function (t) {
+            if (traits[t]) {
+                b3d.cameraDataModel.traitEffects[t].call(this, true);
+            }
+        }, this);
+    };
+
+    camera.deactivate = function () {
+        // disable trait effects
+        Object.keys(traits).forEach(function (t) {
+            if (traits[t]) {
+                b3d.cameraDataModel.traitEffects[t].call(this, false);
+            }
+        }, this);
     };
 
     return camera;

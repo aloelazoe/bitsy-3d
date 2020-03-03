@@ -70,7 +70,7 @@ editor3d.init = function() {
         upperBetaLimit: Math.PI / 2,
         attachControl: true,
     });
-    editor3d.camera.setActive();
+    editor3d.camera.activate();
 
     // make a mesh for 3d cursor
     editor3d.cursor.mesh = BABYLON.MeshBuilder.CreateBox('cursor', { size: 1.1 }, b3d.scene);
@@ -198,7 +198,7 @@ editor3d.init = function() {
         b3d.parseData();
 
         // set editor camera as active again
-        editor3d.camera.setActive();
+        editor3d.camera.activate();
 
         editor3d.suggestReplacingNameTags();
         // clear all caches to force all drawings to reset during the update
@@ -248,11 +248,11 @@ editor3d.init = function() {
     // patch functions that are called when switching play mode on and off
     b3d.patch(bitsy, 'on_play_mode', null, function () {
         // todo: choose what camera should be active by default according to options
-        b3d.cameras[0].setActive();
+        b3d.cameras[0].activate();
     });
 
     b3d.patch(bitsy, 'on_edit_mode', null, function () {
-        editor3d.camera.setActive();
+        editor3d.camera.activate();
     });
 
     // change the behavior of 'find drawing' panel to allow viewing drawings
@@ -1319,7 +1319,7 @@ var meshPanel = {
         var newCamera = b3d.createCamera(b3d.cameraPresets[newPresetValue]);
         // if we are play mode and have the current camera selected, set the new camera as active before deleting the previous one
         if (b3d.scene.activeCamera === b3d.cameras[meshPanel.curCameraIndex].ref) {
-            newCamera.setActive();
+            newCamera.activate();
         }
         b3d.cameras[meshPanel.curCameraIndex].ref.dispose();
         delete b3d.cameras[meshPanel.curCameraIndex];
