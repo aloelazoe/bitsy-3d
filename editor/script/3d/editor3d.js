@@ -206,6 +206,8 @@ editor3d.init = function() {
         b3d.clearCaches(Object.values(b3d.caches));
         // this fixes 3d editor crash when removing rooms right after modifying game data
         bitsy.selectRoom(bitsy.curRoom);
+
+        // todo: update 3d settings panel
     });
 
     // patch refreshGameData function to include 3d data
@@ -884,6 +886,7 @@ var meshPanel = {
         meshPanel.onToggleTransform();
 
         meshPanel.initCameraSettings();
+        meshPanel.toggleAdvancedCameraSettings();
         meshPanel.initGameSettings();
 
         meshPanel.onTabMesh();
@@ -916,6 +919,8 @@ var meshPanel = {
         document.getElementById('settings3dMesh').style.display = 'none';
         document.getElementById('settings3dCamera').style.display = 'block';
         document.getElementById('settings3dGame').style.display = 'none';
+
+        meshPanel.updateCameraSettings();
     },
 
     onTabGame: function() {
@@ -1293,13 +1298,34 @@ var meshPanel = {
         });
         if (!b3d.curCameraPreset) document.getElementById('settings3dCameraPreset').value = 'custom';
         // todo: perhaps only add 'custom' option dynamically, when you modify one of the presets
+
+        // generate ui for camera properties
+        // generate options for camera type
+        Object.keys(b3d.cameraDataModel.cameraTypes).forEach(function(typeName) {
+            var option = document.createElement('option');
+            option.text = option.value = typeName;
+            document.getElementById('settings3dCameraType').add(option);
+            if (b3d.mainCamera.type === typeName) {
+                option.selected = true;
+            }
+        });
+    },
+
+    updateCameraSettings: function () {
+        document.getElementById('settings3dCameraPreset').value = b3d.curCameraPreset || 'custom';
+        document.getElementById('settings3dCameraType').value = b3d.mainCamera.type;
+    },
+
+    makeCameraPresetCustom: function () {
+        b3d.curCameraPreset = null;
+        document.getElementById('settings3dCameraPreset').value = 'custom';
     },
 
     onChangeCameraPreset: function (event) {
         var newPresetValue = document.getElementById('settings3dCameraPreset').value;
         console.log('selected camera preset: ' + newPresetValue);
 
-        // todo: ask for confirmation if the current preset was the custom one
+        // ask for confirmation if the current preset was the custom one
         if (!b3d.curCameraPreset && !window.confirm('if you select a different preset, it will overwrite your custom camera configuration. if you want to save your current camera configuration, you can copy it from game data. are you sure you want to select a different preset?')) {
             document.getElementById('settings3dCameraPreset').value = 'custom';
             return;
@@ -1320,7 +1346,45 @@ var meshPanel = {
             b3d.mainCamera = newCamera;
         }
 
-        // todo: account for cases when game data won't be updated because we are in play mode
+        meshPanel.updateCameraSettings();
+        bitsy.refreshGameData();
+    },
+
+    onChangeCameraType: function (event) {
+        var newType = document.getElementById('settings3dCameraType').value;
+        console.log('selected new camera type: ' + newType);
+
+        // ask for confirmation
+        if (!window.confirm('when you change camera type, some of the settings specific to the current type will be lost. if you want to save your current camera configuration, you can copy it from game data. are you sure you want to select a different camera type?')) {
+            document.getElementById('settings3dCameraType').value = b3d.mainCamera.type;
+            return;
+        }
+
+        meshPanel.makeCameraPresetCustom();
+
+        // preserve properties that are common for all camera types
+        // delete current camera and create a new camera of the specified type
+
+        var newCamera = b3d.createCamera({type: newType});
+        console.log(newCamera);
+
+        // copy common properties from the current camera
+        b3d.deepCopyObjectState(
+            newCamera,
+            Object.values(b3d.cameraDataModel.commonProperties)
+            .reduce(function (accumulator, curValue) {
+                Object.keys(curValue).forEach(function (k) {accumulator[k] = b3d.mainCamera[k]});
+                return accumulator;
+            }, {})
+        );
+
+        if (b3d.scene.activeCamera === b3d.mainCamera.ref) {
+            newCamera.activate();
+        }
+        b3d.mainCamera.ref.dispose();
+        b3d.mainCamera = newCamera;
+
+        meshPanel.updateCameraSettings();
         bitsy.refreshGameData();
     },
 }; // meshPanel
