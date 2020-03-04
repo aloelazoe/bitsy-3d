@@ -529,30 +529,40 @@ b3d.createCamera = function (camData) {
     });
 
     // define methods
-    camera.activate = function () {
-        if (b3d.curActiveCamera) {
-            b3d.curActiveCamera.deactivate();
-        }
-
-        b3d.curActiveCamera = this;
-        b3d.scene.activeCamera = this.ref;
-
-        // enable trait effects
-        Object.keys(traits).forEach(function (t) {
-            if (traits[t]) {
-                b3d.cameraDataModel.traitEffects[t].call(this, true);
+    Object.defineProperty(camera, 'activate', {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: function () {
+            if (b3d.curActiveCamera) {
+                b3d.curActiveCamera.deactivate();
             }
-        }, this);
-    };
 
-    camera.deactivate = function () {
-        // disable trait effects
-        Object.keys(traits).forEach(function (t) {
-            if (traits[t]) {
-                b3d.cameraDataModel.traitEffects[t].call(this, false);
-            }
-        }, this);
-    };
+            b3d.curActiveCamera = this;
+            b3d.scene.activeCamera = this.ref;
+
+            // enable trait effects
+            Object.keys(traits).forEach(function (t) {
+                if (traits[t]) {
+                    b3d.cameraDataModel.traitEffects[t].call(this, true);
+                }
+            }, this);
+        },
+    });
+
+    Object.defineProperty(camera, 'deactivate', {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: function () {
+            // disable trait effects
+            Object.keys(traits).forEach(function (t) {
+                if (traits[t]) {
+                        b3d.cameraDataModel.traitEffects[t].call(this, false);
+                    }
+                }, this);
+        },
+    });
 
     return camera;
 };
