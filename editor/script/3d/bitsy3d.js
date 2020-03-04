@@ -75,7 +75,6 @@ b3d.tweenFunctions = {
 
 b3d.cameraPresets = {
     'orbiting follower': {
-        name: 'orbiting follower',
         type: 'arc',
         fov: 0.9,
         inertia: 0.8,
@@ -91,7 +90,6 @@ b3d.cameraPresets = {
         lockPointer: true,
     },
     'fixed target orbiter': {
-        name: 'fixed target orbiter',
         type: 'arc',
         fov: 0.9,
         inertia: 0.8,
@@ -131,7 +129,6 @@ b3d.cameraPresets = {
 b3d.cameraDataModel = {
     commonProperties: {
         value: {
-            name: undefined,
             fov: 0.9,
             inertia: 0.8,
             minZ: 0.001,
