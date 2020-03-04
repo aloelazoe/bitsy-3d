@@ -79,7 +79,7 @@ b3d.cameraPresets = {
         type: 'arc',
         fov: 0.9,
         inertia: 0.8,
-        target: {x:8, z: 8, y: 3},
+        target: {x: 8, z: 8, y: 3},
         alpha: -Math.PI/2,
         beta: Math.PI/3,
         radius: 6,
@@ -95,7 +95,7 @@ b3d.cameraPresets = {
         type: 'arc',
         fov: 0.9,
         inertia: 0.8,
-        target: {x:8, z: 8, y: 1.5},
+        target: {x: 8, z: 8, y: 1.5},
         alpha: -Math.PI/2,
         beta: Math.PI/3,
         radius: 20,
@@ -115,9 +115,11 @@ b3d.cameraPresets = {
         inertia: 0.6,
         alpha: -Math.PI/2,
         beta: Math.PI/2,
-        radius: 1,
-        lowerRadiusLimit: 0.0001,
-        upperRadiusLimit: 0.0001,
+        radius: 0.5,
+        lowerRadiusLimit: 0.5,
+        upperRadiusLimit: 0.5,
+        upperBetaLimit: 0.75 * Math.PI,
+        lowerBetaLimit: 0.1 * Math.PI,
         minZ: 0.001,
         maxZ: 100,
         attachControl: true,
@@ -128,19 +130,37 @@ b3d.cameraPresets = {
 
 b3d.cameraDataModel = {
     commonProperties: {
-        value: ['name', 'fov', 'inertia', 'minZ', 'maxZ'],
-        vector3: ['target'],
-        trait: ['followAvatar', 'lockPointer'],
+        value: {
+            name: undefined,
+            fov: 0.9,
+            inertia: 0.8,
+            minZ: 0.001,
+            maxZ: 100,
+        },
+        vector3: { target: {x: 8, z: 8, y: 0} },
+        trait: { followAvatar: false, lockPointer: false },
     },
     cameraTypes: {
         arc: {
             class: BABYLON.ArcRotateCamera,
-            value: ['alpha', 'beta', 'radius', 'lowerRadiusLimit', 'upperRadiusLimit', 'wheelPrecision', 'upperBetaLimit', 'lowerBetaLimit'],
-            trait: ['attachControl'],
+            value: {
+                alpha: -Math.PI/2,
+                beta: Math.PI/2,
+                radius: 10,
+                lowerRadiusLimit: 1,
+                upperRadiusLimit: 30,
+                wheelPrecision: 3,
+                upperBetaLimit: Math.PI/2,
+                lowerBetaLimit: 0,
+            },
+            trait: { attachControl: false },
         },
         universal: {
             class: BABYLON.UniversalCamera,
-            vector3: ['position', 'rotation'],
+            vector3: {
+                position: {x: 0, z: 0, y: 0},
+                rotation: {x: 0, z: 0, y: 0}
+            },
         },
     },
     traitEffects: {
@@ -436,36 +456,44 @@ b3d.createCamera = function (camData) {
 
     // set up value properties
     [].concat(
-        b3d.cameraDataModel.commonProperties.value || [],
-        b3d.cameraDataModel.cameraTypes[camData.type].value || [],
+        Object.entries(b3d.cameraDataModel.commonProperties.value || {}),
+        Object.entries(b3d.cameraDataModel.cameraTypes[camData.type].value || {}),
     )
-    .forEach(function (v) {
-        Object.defineProperty(camera, v, {
+    .forEach(function (entry) {
+        var k = entry[0];
+        var v = entry[1];
+        Object.defineProperty(camera, k, {
             configurable: true,
             enumerable: true,
-            get: function () { return this.ref[v]; },
-            set: function (a) { this.ref[v] = a; },
+            get: function () { return this.ref[k]; },
+            set: function (a) { this.ref[k] = a; },
         });
-        if (camData[v] !== undefined && camData[v] !== null) {
-            camera[v] = camData[v];
+        if (camData[k] !== undefined) {
+            camera[k] = camData[k];
+        } else {
+            camera[k] = v;
         }
     });
 
     // set up vector properties
     [].concat(
-        b3d.cameraDataModel.commonProperties.vector3 || [],
-        b3d.cameraDataModel.cameraTypes[camData.type].vector3 || [],
+        Object.entries(b3d.cameraDataModel.commonProperties.vector3 || {}),
+        Object.entries(b3d.cameraDataModel.cameraTypes[camData.type].vector3 || {}),
     )
-    .forEach(function (v) {
-        Object.defineProperty(camera, v, {
+    .forEach(function (entry) {
+        var k = entry[0];
+        var v = entry[1];
+        Object.defineProperty(camera, k, {
             configurable: true,
             enumerable: true,
-            get: function () { return this.ref[v]; },
-            set: function (a) { this.ref[v] = a; },
+            get: function () { return this.ref[k]; },
+            set: function (a) { this.ref[k] = a; },
         });
-        camera[v] = new BABYLON.Vector3();
-        if (camData[v]) {
-            camera[v].copyFromFloats(camData[v].x, camData[v].y, camData[v].z);
+        camera[k] = new BABYLON.Vector3();
+        if (camData[k]) {
+            camera[k].copyFromFloats(camData[k].x, camData[k].y, camData[k].z);
+        } else {
+            camera[k].copyFromFloats(v.x, v.y, v.z);
         }
     });
 
@@ -474,25 +502,29 @@ b3d.createCamera = function (camData) {
     var traits = {};
 
     [].concat(
-        b3d.cameraDataModel.commonProperties.trait || [],
-        b3d.cameraDataModel.cameraTypes[camData.type].trait || [],
+        Object.entries(b3d.cameraDataModel.commonProperties.trait || {}),
+        Object.entries(b3d.cameraDataModel.cameraTypes[camData.type].trait || {}),
     )
-    .forEach(function (t) {
-        traits[t] = null;
-        Object.defineProperty(camera, t, {
+    .forEach(function (entry) {
+        var k = entry[0];
+        var v = entry[1];
+        traits[k] = null;
+        Object.defineProperty(camera, k, {
             configurable: true,
             enumerable: true,
-            get: function () { return traits[t]; },
+            get: function () { return traits[k]; },
             set: function (a) {
-                traits[t] = a;
+                traits[k] = a;
                 // if camera is currently active, invoke trait effect immediately
                 if (b3d.scene.activeCamera === this.ref) {
-                    b3d.cameraDataModel.traitEffects[t].call(this, a);
+                    b3d.cameraDataModel.traitEffects[k].call(this, a);
                 }
             },
         });
-        if (camData[t] !== undefined && camData[t] !== null) {
-            camera[t] = camData[t];
+        if (camData[k] !== undefined) {
+            camera[k] = camData[k];
+        } else {
+            camera[k] = v;
         }
     });
 
