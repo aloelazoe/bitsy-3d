@@ -1323,7 +1323,6 @@ var meshPanel = {
 
     onChangeCameraPreset: function (event) {
         var newPresetValue = document.getElementById('settings3dCameraPreset').value;
-        console.log('selected camera preset: ' + newPresetValue);
 
         // ask for confirmation if the current preset was the custom one
         if (!b3d.curCameraPreset && !window.confirm('if you select a different preset, it will overwrite your custom camera configuration. if you want to save your current camera configuration, you can copy it from game data. are you sure you want to select a different preset?')) {
@@ -1352,7 +1351,6 @@ var meshPanel = {
 
     onChangeCameraType: function (event) {
         var newType = document.getElementById('settings3dCameraType').value;
-        console.log('selected new camera type: ' + newType);
 
         // ask for confirmation
         if (!window.confirm('when you change camera type, some of the settings specific to the current type will be lost. if you want to save your current camera configuration, you can copy it from game data. are you sure you want to select a different camera type?')) {
@@ -1366,7 +1364,6 @@ var meshPanel = {
         // delete current camera and create a new camera of the specified type
 
         var newCamera = b3d.createCamera({type: newType});
-        console.log(newCamera);
 
         // copy common properties from the current camera
         b3d.deepCopyObjectState(
