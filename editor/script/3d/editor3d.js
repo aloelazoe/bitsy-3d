@@ -1185,32 +1185,10 @@ var meshPanel = {
 
     // to be called whenever the value of any of the transform input elements is changed by the user
     onChangeTransform: function (event) {
-        // depending on the user input there could be different combinations
-        // of what is displayed in the input element and what is stored
-        // as a valid input to be used for updating actual game data
-        // * if input is an empty string, minus sign or dot, show it as it is but store default value
-        // * if input is NaN, store and show default value
-        // * if input is a number, show it with number of digits after decimal point
-        //   truncated to 5 maximum
-        var value = event.target.value;
         var index = meshPanel.transformElementNamesOrdered.indexOf(event.target.id);
         var defaultVal = event.target.id.indexOf('Scale') !== -1? 1: 0;
-        if (['', '-', '.', '-.'].indexOf(value) !== -1) {
-            meshPanel.transformValidatedNumbers[index] = defaultVal;
-        } else if (isNaN(value)) {
-            event.target.value = defaultVal;
-            meshPanel.transformValidatedNumbers[index] = defaultVal;
-        } else {
-            var dotIndex = value.indexOf('.');
-            var result;
-            if (dotIndex !== -1) {
-                // only allows 5 digits after decimal point: this will be serialized consistently
-                result = event.target.value = value.slice(0, dotIndex) + value.slice(dotIndex, dotIndex + 6);
-            } else {
-                result = event.target.value;
-            }
-            meshPanel.transformValidatedNumbers[index] = Number(result);
-        }
+        // only allows 5 digits after decimal point: this will be serialized consistently
+        meshPanel.transformValidatedNumbers[index] = meshPanel.validateInputElementAsNumber(event.target, defaultVal, 5);
         
         b3d.meshConfig[meshPanel.curDrw].transform = b3d.transformFromArray(meshPanel.transformValidatedNumbers);
 
@@ -1218,6 +1196,31 @@ var meshPanel = {
         b3d.clearCachesMesh(meshPanel.curDrw);
 
         bitsy.refreshGameData();
+    },
+
+    // sets input element value to a valid in-progress string and returns a validated number
+    validateInputElementAsNumber: function (el, defaultVal, digitsAfterDecimal) {
+        // depending on the user input there could be different combinations
+        // of what is displayed in the input element and what is stored
+        // as a valid input to be used for updating actual game data
+        // * if input is an empty string, minus sign or dot, show it as it is but store default value
+        // * if input is NaN, store and show default value
+        // * if input is a number, show it with a specified number of digits after decimal point
+        var result;
+        if (['', '-', '.', '-.'].indexOf(el.value) !== -1) {
+            result = defaultVal;
+        } else if (isNaN(el.value)) {
+            result = el.value = defaultVal;
+        } else {
+            var dotIndex = el.value.indexOf('.');
+            if (digitsAfterDecimal && dotIndex !== -1) {
+                // only allows a set number of digits after a decimal point
+                result = el.value = el.value.slice(0, dotIndex) + el.value.slice(dotIndex, dotIndex + digitsAfterDecimal + 1);
+            } else {
+                result = el.value;
+            }
+        }
+        return Number(result);
     },
 
     addChildDropHandler: function (event) {
