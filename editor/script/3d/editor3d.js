@@ -837,6 +837,8 @@ var meshPanel = {
     transformInputEls: [],
     transformValidatedNumbers: [1,1,1, 0,0,0, 0,0,0],
 
+    cameraSettingsControllers: [],
+
     init: function() {
         meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
         meshPanel.subTypeSelectEl = document.getElementById('meshSubTypeSelect');
@@ -1312,11 +1314,138 @@ var meshPanel = {
                 option.selected = true;
             }
         });
+
+        // generate ui for other properties
+        // get the list of all possible camera properties
+        var allCameraProps = [].concat(
+            Object.values(b3d.cameraDataModel.commonProperties),
+            Object.values(b3d.cameraDataModel.cameraTypes).reduce(function (accumulator, typePropKinds) {
+                return [].concat(accumulator, (Object.values(typePropKinds)));
+            }, []),
+        ).reduce(function (accumulator, propList) {
+                if (typeof propList === 'object') Object.keys(propList).forEach(function (k) { accumulator[k] = propList[k] });
+                return accumulator;
+        }, {});
+
+        Object.keys(allCameraProps).forEach(function (key) {
+            var controller = new meshPanel.PropertyUIController(
+                key, allCameraProps[key],
+                document.getElementById('settings3dCameraAdvanced'),
+                function (evt) { meshPanel.makeCameraPresetCustom(); },
+            );
+
+            // customize specific properties
+            // display angles in degrees
+            if (['alpha', 'beta', 'upperBetaLimit', 'lowerBetaLimit'].indexOf(key) !== -1) {
+                controller.convertFromData = function (a) { return Number(a) * 180 / Math.PI; };
+                controller.convertToData = function (a) { return Number(a) * Math.PI / 180; };
+            } else if (key === 'rotation') {
+                controller.nestedControllers.forEach(function (c) {
+                    c.convertFromData = function (a) { return Number(a) * 180 / Math.PI; };
+                    c.convertToData = function (a) { return Number(a) * Math.PI / 180; };
+                });
+            }
+            controller.update(b3d.mainCamera);
+
+            meshPanel.cameraSettingsControllers.push(controller);
+        });
+        
+    },
+
+    PropertyUIController: function (boundPropertyName, defaultPropertyValue, elementParent, onInput) {
+        this.internalValue = null;
+        this.nestedControllers = [];
+
+        // bound object will be set through update method
+        this.boundObject = null;
+        this.boundPropertyName = boundPropertyName;
+        this.defaultPropertyValue = defaultPropertyValue;
+        this.elementParent = elementParent;
+        this.onInput = onInput;
+        
+        this.validate = function () {return this.elementInput.value;};
+        this.convertToData = function (a) {return a;};
+        this.convertFromData = function (a) {return a;};
+
+        this.elementDiv = document.createElement('div');
+        this.elementParent.appendChild(this.elementDiv);
+        
+        this.elementLabel = document.createElement('label');
+        this.elementDiv.appendChild(this.elementLabel);
+        this.elementLabel.innerHTML = this.boundPropertyName.replace(/([A-Z])/g, " $1" ).toLowerCase() + ': ';
+
+        if (typeof this.defaultPropertyValue === 'object') {
+            // create nested controllers recursively
+            Object.keys(this.defaultPropertyValue).forEach(function (key, idx) {
+                // bound objects will be set through update method
+                this.nestedControllers.push(
+                    new meshPanel.PropertyUIController(key, this.defaultPropertyValue[key], this.elementDiv, this.onInput)
+                );
+                // add a margin
+                this.nestedControllers[idx].elementDiv.style.marginLeft = '10px';
+            }, this);
+        } else {
+            // create input element
+            this.elementInput = document.createElement('input');
+            this.elementDiv.appendChild(this.elementInput);
+
+            // customize input elements for different data types
+            if (typeof this.defaultPropertyValue === 'number') {
+                this.validate = meshPanel.validateInputElementAsNumber.bind(null, this.elementInput, 0, 5);
+                this.convertToData = function (a) { return Number(a); };
+            } else if (typeof this.defaultPropertyValue === 'boolean') {
+                this.elementInput.type = 'checkbox';
+                this.elementInput.style.display = 'inline';
+            }
+
+            var thisController = this;
+            this.elementInput.addEventListener('input', function (evt) {
+                if (!thisController.boundObject) return;
+                if (this.type === 'checkbox') {
+                    thisController.boundObject[thisController.boundPropertyName] = this.checked;
+                } else {
+                    thisController.internalValue = thisController.validate()
+                    thisController.boundObject[thisController.boundPropertyName] = thisController.convertToData(thisController.internalValue);
+                }
+                thisController.onInput(evt);
+                bitsy.refreshGameData();
+            });
+        }
+
+        this.update = function (boundObject) {
+            this.boundObject = boundObject;
+            if (this.boundPropertyName in this.boundObject) {
+                this.show();
+            } else {
+                this.hide();
+                return;
+            }
+
+            if (this.nestedControllers.length > 0) {
+                this.nestedControllers.forEach(function (c) {c.update(this.boundObject[this.boundPropertyName])}, this);
+            } else {
+                if (this.elementInput.type === 'checkbox') {
+                    this.elementInput.checked = this.boundObject[this.boundPropertyName]
+                } else {
+                    this.elementInput.value = this.convertFromData(this.boundObject[this.boundPropertyName]);
+                }
+            }
+        };
+
+        this.show = function () {
+            this.elementDiv.style.display = 'block';
+        };
+        this.hide = function () {
+            this.elementDiv.style.display = 'none';
+        };
     },
 
     updateCameraSettings: function () {
         document.getElementById('settings3dCameraPreset').value = b3d.curCameraPreset || 'custom';
         document.getElementById('settings3dCameraType').value = b3d.mainCamera.type;
+        meshPanel.cameraSettingsControllers.forEach(function (controller) {
+            controller.update(b3d.mainCamera);
+        });
     },
 
     makeCameraPresetCustom: function () {
