@@ -130,17 +130,16 @@ b3d.cameraDataModel = {
     commonProperties: {
         value: {
             fov: 0.9,
-            inertia: 0.8,
             minZ: 0.001,
             maxZ: 100,
         },
-        vector3: { target: {x: 8, z: 8, y: 0} },
         trait: { followAvatar: false, lockPointer: false },
     },
     cameraTypes: {
         arc: {
             class: BABYLON.ArcRotateCamera,
             value: {
+                inertia: 0.8,
                 alpha: -Math.PI/2,
                 beta: Math.PI/2,
                 radius: 10,
@@ -150,6 +149,7 @@ b3d.cameraDataModel = {
                 upperBetaLimit: Math.PI/2,
                 lowerBetaLimit: 0,
             },
+            vector3: { target: {x: 8, z: 8, y: 0} },
             trait: { attachControl: false },
         },
         universal: {
