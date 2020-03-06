@@ -1317,15 +1317,18 @@ var meshPanel = {
 
         // generate ui for other properties
         // get the list of all possible camera properties
-        var allCameraProps = [].concat(
-            Object.values(b3d.cameraDataModel.commonProperties),
-            Object.values(b3d.cameraDataModel.cameraTypes).reduce(function (accumulator, typePropKinds) {
-                return [].concat(accumulator, (Object.values(typePropKinds)));
-            }, []),
-        ).reduce(function (accumulator, propList) {
-                if (typeof propList === 'object') Object.keys(propList).forEach(function (k) { accumulator[k] = propList[k] });
-                return accumulator;
-        }, {});
+        //  arrange properties in this order: traits, values, vectors
+        var allCameraProps = {};
+        ['trait', 'value', 'vector3'].forEach(function (propType) {
+            Object.entries(b3d.cameraDataModel.commonProperties[propType] || {}).forEach(function (propEntry) {
+                allCameraProps[propEntry[0]] = propEntry[1];
+            });
+            Object.values(b3d.cameraDataModel.cameraTypes).forEach(function (cameraTypeObj) {
+                Object.entries(cameraTypeObj[propType] || {}).forEach(function (propEntry) {
+                    allCameraProps[propEntry[0]] = propEntry[1];
+                });
+            });
+        });
 
         Object.keys(allCameraProps).forEach(function (key) {
             var controller = new meshPanel.PropertyUIController(
