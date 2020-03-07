@@ -838,6 +838,7 @@ var meshPanel = {
     transformValidatedNumbers: [1,1,1, 0,0,0, 0,0,0],
 
     cameraSettingsControllers: [],
+    gameSettingsControllers: [],
 
     init: function() {
         meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
@@ -934,6 +935,8 @@ var meshPanel = {
         document.getElementById('settings3dCamera').style.display = 'none';
         document.getElementById('settings3dMesh').style.display = 'none';
         document.getElementById('settings3dGame').style.display = 'block';
+
+        meshPanel.updateGameSettings();
     },
 
     onTabBase: function() {
@@ -1244,39 +1247,49 @@ var meshPanel = {
         console.log('addChildDragoverHandler');
     },
 
-    // generate ui for configuring 3d game settings
+    // generate ui for selected 3d game settings
     initGameSettings: function () {
-        Object.entries(b3d.settings).forEach(function (entry) {
-            var key = entry[0];
-            var value = entry[1];
-
-            var divEl = document.createElement('div');
-            var labelEl = document.createElement('label');
-            var inputEl = document.createElement('input');
-
-            document.getElementById('settings3dGame').appendChild(divEl);
-            divEl.appendChild(labelEl);
-            divEl.appendChild(inputEl);
-
-            labelEl.innerHTML = key.replace(/([A-Z])/g, " $1" ).toLowerCase() + ': ';
-
-            inputEl.value = value;
-            switch (typeof value) {
-                case 'number':
-                    // inputEl.type = 'number';
-                    // inputEl.step = 0.0001;
-                    inputEl.addEventListener('input', function (evt) {
-                        console.log(key + ' was changed');
-                    });
-                    break;
-                case 'boolean':
-                    inputEl.type = 'checkbox';
-                    inputEl.style.display = 'inline';
-                    inputEl.addEventListener('input', function (evt) {
-                        console.log(key + ' was changed');
-                    });
-                    break;
+        Object.keys(b3d.settings).filter(function (key){
+            return ['clearColor', 'fogColor', 'tweenFunction'].indexOf(key) === -1
+        })
+        .forEach(function (key) {
+        // ['engineWidth', 'engineHeight', 'engineAutoResize'].forEach(function (key) {
+            var controller = new meshPanel.PropertyUIController(
+                key, b3d.settings[key],
+                document.getElementById('settings3dGame'),
+                function (event) { b3d.applySettings(); }
+            );
+            controller.update(b3d.settings);
+            meshPanel.gameSettingsControllers.push(controller);
+        });
+        // add a dropdown menu for tween functions
+        var div = document.createElement('div');
+        document.getElementById('settings3dGame').appendChild(div);
+        var label = document.createElement('label');
+        div.appendChild(label);
+        label.innerHTML = 'tween function: ';
+        var select = document.createElement('select');
+        select.id = 'settings3dTweenFunction';
+        div.appendChild(select);
+        Object.keys(b3d.tweenFunctions).forEach(function(tweenName) {
+            var option = document.createElement('option');
+            option.text = option.value = tweenName;
+            select.add(option);
+            if (b3d.settings.tweenFunction === tweenName) {
+                option.selected = true;
             }
+        });
+        select.onchange = function (event) {
+            console.log('select onchange: ' + event.target.value);
+            b3d.settings.tweenFunction = event.target.value;
+            bitsy.refreshGameData();
+        }
+    },
+
+    updateGameSettings: function () {
+        document.getElementById('settings3dTweenFunction').value = b3d.settings.tweenFunction;
+        meshPanel.gameSettingsControllers.forEach(function (controller) {
+            controller.update(b3d.settings);
         });
     },
 
@@ -1410,7 +1423,7 @@ var meshPanel = {
                     thisController.internalValue = thisController.validate()
                     thisController.boundObject[thisController.boundPropertyName] = thisController.convertToData(thisController.internalValue);
                 }
-                thisController.onInput(evt);
+                if (thisController.onInput) thisController.onInput(evt);
                 bitsy.refreshGameData();
             });
         }
