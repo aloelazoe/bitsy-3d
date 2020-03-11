@@ -184,30 +184,7 @@ editor3d.init = function() {
     });
 
     bitsy.events.Listen("game_data_change", function() {
-        // since there is no way to tell what exactly was changed, reset everything
-        // reset stack objects
-        b3d.roomsInStack = {};
-        b3d.stackPosOfRoom = {};
-        b3d.meshConfig = {};
-
-        // delete camera
-        b3d.mainCamera.deactivate();
-        b3d.mainCamera.ref.dispose();
-        b3d.mainCamera = null;
-
-        // reload data
-        b3d.parseData();
-
-        // set editor camera as active again
-        editor3d.camera.activate();
-
-        editor3d.suggestReplacingNameTags();
-        // clear all caches to force all drawings to reset during the update
-        b3d.clearCaches(Object.values(b3d.caches));
-        // this fixes 3d editor crash when removing rooms right after modifying game data
-        bitsy.selectRoom(bitsy.curRoom);
-
-        // todo: update 3d settings panel
+        editor3d.reInit3dData();
     });
 
     // patch refreshGameData function to include 3d data
@@ -250,11 +227,11 @@ editor3d.init = function() {
 
     // patch functions that are called when switching play mode on and off
     b3d.patch(bitsy, 'on_play_mode', null, function () {
-        // todo: choose what camera should be active by default according to options
         b3d.mainCamera.activate();
     });
 
     b3d.patch(bitsy, 'on_edit_mode', null, function () {
+        editor3d.reInit3dData();
         editor3d.camera.activate();
     });
 
@@ -307,6 +284,34 @@ editor3d.updateTextureOneTimeListener = function(e) {
     // will get updated too, instead of continuing to point to a deleted texture
     b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
     document.removeEventListener('mouseup', editor3d.updateTextureOneTimeListener);
+};
+
+editor3d.reInit3dData = function () {
+    // since there is no way to tell what exactly was changed, reset everything
+    // reset stack objects
+    b3d.roomsInStack = {};
+    b3d.stackPosOfRoom = {};
+    b3d.meshConfig = {};
+
+    // delete camera
+    b3d.mainCamera.deactivate();
+    b3d.mainCamera.ref.dispose();
+    b3d.mainCamera = null;
+
+    // reload data
+    b3d.parseData();
+
+    // set editor camera as active again
+    editor3d.camera.activate();
+
+    editor3d.suggestReplacingNameTags();
+    // clear all caches to force all drawings to reset during the update
+    b3d.clearCaches(Object.values(b3d.caches));
+    // this fixes 3d editor crash when removing rooms right after modifying game data
+    bitsy.selectRoom(bitsy.curRoom);
+
+    // update 3d settings panel. will automatically switch to mesh tab
+    meshPanel.updateAll();
 };
 
 editor3d.suggestReplacingNameTags = function () {
@@ -892,6 +897,7 @@ var meshPanel = {
         meshPanel.toggleAdvancedCameraSettings();
         meshPanel.initGameSettings();
 
+        // select and update base mesh tab
         meshPanel.onTabMesh();
     },
 
@@ -905,20 +911,16 @@ var meshPanel = {
     onTabMesh: function() {
         // make sure the correct tab is checked
         document.getElementById('settings3dTabMesh').checked = true;
-
-        console.log('select mesh tab');
-
         document.getElementById('settings3dMesh').style.display = 'block';
         document.getElementById('settings3dCamera').style.display = 'none';
         document.getElementById('settings3dGame').style.display = 'none';
+
+        meshPanel.onTabBase();
     },
 
     onTabCamera: function() {
         // make sure the correct tab is checked
         document.getElementById('settings3dTabCamera').checked = true;
-
-        console.log('select camera tab');
-
         document.getElementById('settings3dMesh').style.display = 'none';
         document.getElementById('settings3dCamera').style.display = 'block';
         document.getElementById('settings3dGame').style.display = 'none';
@@ -929,9 +931,6 @@ var meshPanel = {
     onTabGame: function() {
         // make sure the correct tab is checked
         document.getElementById('settings3dTabGame').checked = true;
-
-        console.log('select game tab');
-
         document.getElementById('settings3dCamera').style.display = 'none';
         document.getElementById('settings3dMesh').style.display = 'none';
         document.getElementById('settings3dGame').style.display = 'block';
@@ -939,8 +938,8 @@ var meshPanel = {
         meshPanel.updateGameSettings();
     },
 
+    // update mesh settings and make sure base mesh tab is selected
     onTabBase: function() {
-        // make sure the correct tab is checked
         document.getElementById('meshTabBase').checked = true;
 
         document.getElementById('meshChildrenList').style.display = 'none';
@@ -950,8 +949,9 @@ var meshPanel = {
         document.getElementById('meshConfig').style.display = 'block';
 
         // update mesh config options to reflect the base mesh
-        meshPanel.curDrw = bitsy.drawing.getEngineObject().drw;
-        console.log('selected base mesh ' + meshPanel.curDrw);
+        var drawing = bitsy.drawing.getEngineObject();
+        meshPanel.curDrw = drawing.drw;
+        document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(drawing);
 
         meshPanel.updateMeshConfigWidgets();
     },
@@ -1113,14 +1113,15 @@ var meshPanel = {
         return title;
     },
 
+    updateAll: function () {
+        meshPanel.onTabBase();
+        meshPanel.updateCameraSettings();
+        meshPanel.updateGameSettings();
+    },
+
     // to be called when another drawing is selected
     updateSelection: function () {
-        var drawing = bitsy.drawing.getEngineObject();
-        meshPanel.curDrw = drawing.drw;
-        console.log('selected base mesh ' + meshPanel.curDrw);
-        document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(drawing);
-        meshPanel.onTabBase();
-        meshPanel.updateMeshConfigWidgets();
+        meshPanel.onTabMesh();
     },
 
     updateType: function () {
