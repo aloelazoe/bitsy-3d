@@ -228,11 +228,13 @@ editor3d.init = function() {
     // patch functions that are called when switching play mode on and off
     b3d.patch(bitsy, 'on_play_mode', null, function () {
         b3d.mainCamera.activate();
+        document.getElementById('playModeWarning').style.display = 'block';
     });
 
     b3d.patch(bitsy, 'on_edit_mode', null, function () {
         editor3d.reInit3dData();
         editor3d.camera.activate();
+        document.getElementById('playModeWarning').style.display = 'none';
     });
 
     // change the behavior of 'find drawing' panel to allow viewing drawings
