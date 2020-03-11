@@ -225,6 +225,11 @@ editor3d.init = function() {
         }
     );
 
+    // update drawing name in 3d settings panel when it's modified
+    b3d.patch(bitsy, 'on_drawing_name_change', null, function () {
+        document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(bitsy.drawing.getEngineObject());
+    });
+
     // patch functions that are called when switching play mode on and off
     b3d.patch(bitsy, 'on_play_mode', null, function () {
         b3d.mainCamera.activate();
