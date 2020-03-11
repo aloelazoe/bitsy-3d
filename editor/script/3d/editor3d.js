@@ -234,12 +234,16 @@ editor3d.init = function() {
     b3d.patch(bitsy, 'on_play_mode', null, function () {
         b3d.mainCamera.activate();
         document.getElementById('playModeWarning').style.display = 'block';
+        document.getElementById('previewCameraDiv').style.display = 'none';
+        document.getElementById('previewCameraLabelScene3d').style.display = 'none';
     });
 
     b3d.patch(bitsy, 'on_edit_mode', null, function () {
         editor3d.reInit3dData();
-        editor3d.camera.activate();
+        meshPanel.switchPreviewCamera(document.getElementById('previewCameraInput').checked);
         document.getElementById('playModeWarning').style.display = 'none';
+        document.getElementById('previewCameraDiv').style.display = 'block';
+        document.getElementById('previewCameraLabelScene3d').style.display = 'inline';
     });
 
     // change the behavior of 'find drawing' panel to allow viewing drawings
@@ -711,7 +715,7 @@ editor3d.update = function () {
     b3d.update();
 
     // update cursor
-    if (!bitsy.isPlayMode && editor3d.cursor.shouldUpdate) {
+    if (b3d.scene.activeCamera === editor3d.camera.ref && editor3d.cursor.shouldUpdate) {
         editor3d.updateCursor(b3d.scene.pick(
             b3d.scene.pointerX, b3d.scene.pointerY,
             function(m) {
@@ -1311,6 +1315,28 @@ var meshPanel = {
         }
     },
 
+    switchPreviewCamera: function (on) {
+        meshPanel.updatePreviewCameraButtons(on);
+        if (on) {
+            b3d.mainCamera.activate();
+            meshPanel.onTabCamera();
+        } else {
+            editor3d.camera.activate();
+        }
+    },
+
+    updatePreviewCameraButtons: function (checked) {
+        document.getElementById('previewCameraInput').checked = checked;
+        document.getElementById('previewCameraInputScene3d').checked = checked;
+        if (checked) {
+            document.getElementById('previewCameraIcon').innerText = 'visibility_off';
+            document.getElementById('previewCameraSpan').innerText = 'switch back to editor camera';
+        } else {
+            document.getElementById('previewCameraIcon').innerText = 'visibility';
+            document.getElementById('previewCameraSpan').innerText = 'preview game camera';
+        }
+    },
+
     initCameraSettings: function () {
         // generate option element for each preset
         Object.keys(b3d.cameraPresets).forEach(function(presetName) {
@@ -1374,6 +1400,8 @@ var meshPanel = {
             meshPanel.cameraSettingsControllers.push(controller);
         });
         
+        // make sure preview game camera buttons are reset
+        meshPanel.updatePreviewCameraButtons(false);
     },
 
     PropertyUIController: function (boundPropertyName, defaultPropertyValue, elementParent, onInput) {

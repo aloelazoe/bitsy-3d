@@ -298,6 +298,11 @@
 							<i class="material-icons" id="playModeIcon">play_arrow</i>
 							<span id="playModeText" class="localize play_game">play</span> <!-- TODO LOCALIZE: also stop_game -->
 						</label>
+
+						<input type="checkbox" id="previewCameraInputScene3d" onclick="meshPanel.switchPreviewCamera(event.target.checked);" />
+						<label id="previewCameraLabelScene3d" title="switch between editor and game cameras" for="previewCameraInputScene3d">
+							<i class="material-icons">videocam</i>
+						</label>
 					</div>
 
 					<div id="gameContainer" style="position: relative;">
@@ -442,8 +447,15 @@
 					</div> <!-- settings3dMesh -->
 
 					<div id="settings3dCamera" class="controlBox" style="display: none; margin-top: 8px;">
-						<label for="settings3dCameraPreset">preset: </label>
-						<select id="settings3dCameraPreset" onchange="meshPanel.onChangeCameraPreset(event);">
+						<div id="previewCameraDiv" style="margin-bottom:2px;">			
+							<input type="checkbox" id="previewCameraInput" onclick="meshPanel.switchPreviewCamera(event.target.checked);" />
+							<label title="switch between editor and game cameras" for="previewCameraInput">
+								<i id="previewCameraIcon" class="material-icons">visibility</i>
+								<span id="previewCameraSpan">preview game camera</span>
+							</label>
+						</div>
+
+						<select id="settings3dCameraPreset" title="select a camera preset" onchange="meshPanel.onChangeCameraPreset(event);">
 							<option value="custom" id="customCameraPresetOption">custom</option>
 							<!-- generate other options dynamically -->
 						</select>
