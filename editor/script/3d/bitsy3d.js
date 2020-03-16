@@ -62,7 +62,7 @@ var b3d = {
 
     isPointerLocked: false,
 
-    defaultCameraPreset: 'free first person',
+    defaultCameraPreset: 'orbiting follower',
 };
 
 b3d.tweenFunctions = {
