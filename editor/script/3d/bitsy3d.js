@@ -60,6 +60,8 @@ var b3d = {
     dialogDirty: false,
     rawDirection: bitsy.Direction.None,
 
+    isPointerLocked: false,
+
     defaultCameraPreset: 'free first person',
 };
 
@@ -317,6 +319,15 @@ b3d.init = function () {
     // watch for browser/canvas resize events
     window.addEventListener("resize", function () {
         if (b3d.settings.engineAutoResize) b3d.engine.resize();
+    });
+
+    // watch for locking/unlocking the pointer
+    document.addEventListener('pointerlockchange', function () {
+        if (document.pointerLockElement || document.mozPointerLockElement) {
+            b3d.isPointerLocked = true;
+        } else {
+            b3d.isPointerLocked = false;
+        }
     });
 };
 

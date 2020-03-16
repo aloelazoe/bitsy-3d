@@ -162,6 +162,14 @@ editor3d.init = function() {
         if (editor3d.cursor.shouldUpdate && editor3d.cursor.isMouseDown) {
             editor3d.cursor.turnOff();
         }
+        // update game camera ui and data when moving the camera in camera preview mode
+        if (b3d.scene.activeCamera === b3d.mainCamera.ref && b3d.mainCamera.attachControl && (editor3d.cursor.isMouseDown || b3d.mainCamera.lockPointer && b3d.isPointerLocked)) {
+            meshPanel.updateCameraSettings();
+            if (!bitsy.isPlayMode) {
+                meshPanel.makeCameraPresetCustom();
+                bitsy.refreshGameData();
+            }
+        }
     };
 
     b3d.scene.onPointerUp = editor3d.onPointerUp;
