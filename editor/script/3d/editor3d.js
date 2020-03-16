@@ -1224,6 +1224,12 @@ var meshPanel = {
 
         // force mesh instances to be recreated with the new transform by clearing the cache
         b3d.clearCachesMesh(meshPanel.curDrw);
+        // make sure any parents that use this mesh as a child are recreated too
+        Object.keys(b3d.meshConfig).forEach(function (drw) {
+            if (b3d.meshConfig[drw].children && b3d.meshConfig[drw].children.indexOf(editor3d.getDrawingFromDrw(meshPanel.curDrw)) !== -1) {
+                b3d.clearCachesMesh(drw);
+            }
+        });
 
         bitsy.refreshGameData();
     },
