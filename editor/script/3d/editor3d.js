@@ -192,6 +192,11 @@ editor3d.init = function() {
         b3d.serializeData();
     });
 
+    b3d.patch(bitsy, 'resetGameData', function () {
+        delete bitsy.dialog['DATA3D'];
+        editor3d.reInit3dData();
+    });
+
     // patch delete room function to fix crash when deleting rooms from vanilla room panel
     b3d.patch(bitsy, 'deleteRoom',
         function () {
