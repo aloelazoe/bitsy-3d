@@ -344,16 +344,9 @@ b3d.parseDataFromDialog = function () {
 
     // parse mesh config
     // b3d.meshConfig should contain configuration for every drawing
-    // all objects must have drawing, type, and transparency properties set by b3d.getDefaultMeshProps,
-    // and other properties are optional
     [].concat(Object.values(bitsy.tile), Object.values(bitsy.sprite), Object.values(bitsy.item)).forEach(function (drawing) {
         var parsedConfig = parsed && parsed.mesh[drawing.drw] || {};
-        var config = b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
-        config.type = parsedConfig.type || config.type;
-        config.transparency = parsedConfig.hasOwnProperty('transparency') ? parsedConfig.transparency : config.transparency;
-        config.transform = parsedConfig.transform && b3d.transformFromArray(parsedConfig.transform.split(','));
-        config.replacement = parsedConfig.replacement && b3d.getDrw(parsedConfig.replacement);
-        config.children = parsedConfig.children && parsedConfig.children.map(b3d.getDrw);
+        b3d.meshConfig[drawing.drw] = b3d.parseMesh(drawing, parsedConfig);
     });
 
     // parse stacks
@@ -393,6 +386,18 @@ b3d.parseDataFromDialog = function () {
 }; // b3d.parseDataFromDialog ()
 
 b3d.parseData = b3d.parseDataFromDialog;
+
+// all objects must have drawing, type, and transparency properties set by b3d.getDefaultMeshProps,
+// and other properties are optional
+b3d.parseMesh = function (drawing, parsedConfig) {
+    var config = b3d.getDefaultMeshProps(drawing);
+    config.type = parsedConfig.type || config.type;
+    config.transparency = parsedConfig.hasOwnProperty('transparency') ? parsedConfig.transparency : config.transparency;
+    config.transform = parsedConfig.transform && b3d.transformFromArray(parsedConfig.transform.split(','));
+    config.replacement = parsedConfig.replacement && b3d.getDrw(parsedConfig.replacement);
+    config.children = parsedConfig.children && parsedConfig.children.map(b3d.getDrw);
+    return config;
+};
 
 b3d.applySettings = function () {
     bitsy.playerHoldToMoveInterval = b3d.settings.movementHoldInterval;
@@ -647,27 +652,8 @@ b3d.serializeDataAsDialog = function () {
     Object.entries(b3d.meshConfig).forEach(function (entry) {
         var id = entry[0]
         var config = entry[1];
-        var drawing = config.drawing;
 
-        var configSerialized = {};
-
-        if (config.type !== b3d.getDefaultMeshType(drawing)) {
-            configSerialized.type = config.type;
-        }
-        if (config.transform && !config.transform.isIdentity()) {
-            configSerialized.transform = b3d.serializeTransform(config.transform).join(',');
-        }
-        if (config.transparency !== b3d.getDefaultTransparency(drawing)) {
-            configSerialized.transparency = config.transparency;
-        }
-        if (config.replacement) {
-            configSerialized.replacement = config.replacement.drw;
-        }
-        if (config.children) {
-            configSerialized.children = config.children.map(function (drawing) {
-                return drawing.drw;
-            });
-        }
+        var configSerialized = b3d.serializeMesh(config);
 
         if (Object.values(configSerialized).length > 0) {
             meshSerialized[id] = configSerialized;
@@ -685,6 +671,32 @@ b3d.serializeDataAsDialog = function () {
 }; // b3d.serializeDataAsDialog
 
 b3d.serializeData = b3d.serializeDataAsDialog;
+
+b3d.serializeMesh = function (meshConfig) {
+    var drawing = meshConfig.drawing;
+
+    var configSerialized = {};
+
+    if (meshConfig.type !== b3d.getDefaultMeshType(drawing)) {
+        configSerialized.type = meshConfig.type;
+    }
+    if (meshConfig.transform && !meshConfig.transform.isIdentity()) {
+        configSerialized.transform = b3d.serializeTransform(meshConfig.transform).join(',');
+    }
+    if (meshConfig.transparency !== b3d.getDefaultTransparency(drawing)) {
+        configSerialized.transparency = meshConfig.transparency;
+    }
+    if (meshConfig.replacement) {
+        configSerialized.replacement = meshConfig.replacement.drw;
+    }
+    if (meshConfig.children) {
+        configSerialized.children = meshConfig.children.map(function (drawing) {
+            return drawing.drw;
+        });
+    }
+
+    return configSerialized;
+};
 
 b3d.serializeTransform = function (transform) {
     // serialize transform matrix as an array:
