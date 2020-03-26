@@ -17,13 +17,18 @@ b3d.parseDataFromNameTags = function () {
     });
     // parse mesh config
     [].concat(Object.values(bitsy.tile), Object.values(bitsy.sprite), Object.values(bitsy.item)).forEach(function (drawing) {
-        var config = b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
-        config.type = b3d.parseMeshTag(drawing) || config.type;
-        config.transparency = b3d.parseTransparentTag(drawing) === undefined && config.transparency || b3d.parseTransparentTag(drawing);
-        config.transform = b3d.parseTransformTags(drawing);
-        config.replacement = b3d.parseDrawTag(drawing);
-        config.children = b3d.parseChildrenTag(drawing);
+        b3d.meshConfig[drawing.drw] = b3d.parseMeshConfigFromNameTags(drawing);
     });
+};
+
+b3d.parseMeshConfigFromNameTags = function (drawing) {
+    var config = b3d.getDefaultMeshProps(drawing);
+    config.type = b3d.parseMeshTag(drawing) || config.type;
+    config.transparency = b3d.parseTransparentTag(drawing) === undefined && config.transparency || b3d.parseTransparentTag(drawing);
+    config.transform = b3d.parseTransformTags(drawing);
+    config.replacement = b3d.parseDrawTag(drawing);
+    config.children = b3d.parseChildrenTag(drawing);
+    return config;
 };
 
 // returns transform matrix or undefined
@@ -116,7 +121,10 @@ b3d.parseChildrenTag = function (drawing) {
                             map = bitsy.sprite;
                     }
                     if (map) {
-                        return map[id];
+                        var childDrawing = map[id];
+                        if (childDrawing) {
+                            return b3d.parseMeshConfigFromNameTags(childDrawing);
+                        }
                     }
                 }
             }

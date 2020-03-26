@@ -848,9 +848,12 @@ var room3dPanel = {
 
 // set up and respond to ui elements in mesh panel
 var meshPanel = {
+    // the index of currently selected child mesh or -1 if base mesh is selected
+    curChildIndex: -1,
+
     // drw of the drawing that the changes should be applied to
     // can refer to base mesh or one of the children
-    curDrw: null,
+    // curDrw: null,
 
     subTypePrefixes: ['tower'],
     typeSelectEl: null,
@@ -974,7 +977,7 @@ var meshPanel = {
 
         // update mesh config options to reflect the base mesh
         var drawing = bitsy.drawing.getEngineObject();
-        meshPanel.curDrw = drawing.drw;
+        meshPanel.curChildIndex = -1;
         document.getElementById('meshBaseName').innerHTML = meshPanel.getDrawingFullTitle(drawing);
 
         meshPanel.updateMeshConfigWidgets();
@@ -1021,12 +1024,14 @@ var meshPanel = {
         // make new elements
         var children = b3d.meshConfig[bitsy.drawing.getEngineObject().drw].children;
         if (children && children.length > 0) {
-            children.forEach(meshPanel.addSelectChildEl);
+            children.forEach(function (childConfig, i){
+                meshPanel.addSelectChildEl(childConfig.drawing, i);
+            });
             meshPanel.updateMeshConfigWidgets();
         }
     },
 
-    addSelectChildEl: function(drawing) {
+    addSelectChildEl: function(drawing, childIndex) {
         // add new child element. it will be checked by default
         // and selected as current drawing for editing mesh configuration
         var childrenList = document.getElementById('meshChildrenList');
@@ -1046,15 +1051,15 @@ var meshPanel = {
         spanEl.innerHTML = meshPanel.getDrawingFullTitle(drawing);
         
         // set up radio button element and mark it as checked
-        Object.assign(inputEl, {type: 'radio', name: 'children list', value: drawing.drw, id: inputId, onclick: meshPanel.selectChild, checked: true});
+        Object.assign(inputEl, {type: 'radio', name: 'children list', value: childIndex, id: inputId, onclick: meshPanel.selectChild, checked: true});
         // select drawing as current
-        meshPanel.curDrw = drawing.drw;
+        meshPanel.curChildIndex = childIndex;
 
         // make delete button
         var deleteButton = document.createElement('button');
         deleteButton.setAttribute('class', 'color0');
         deleteButton.setAttribute('style', 'margin-top: 2px; margin-left: 2px;');
-        Object.assign(deleteButton, {value: drawing.drw, title: 'delete child mesh', onclick: meshPanel.deleteChild});
+        Object.assign(deleteButton, {value: childIndex, title: 'delete child mesh', onclick: meshPanel.deleteChild});
         deleteButton.innerHTML = '<i class="material-icons">remove_circle</i>';
         divEl.appendChild(deleteButton);
     },
@@ -1067,8 +1072,8 @@ var meshPanel = {
 
         // the child radio button will be marked as checked by the click
         // also select the respective drawing as current
-        meshPanel.curDrw = event.target.value;
-        console.log('selected child: ' + meshPanel.curDrw);
+        meshPanel.curChildIndex = Number(event.target.value);
+        console.log('selected child: ' + meshPanel.curChildIndex);
 
         meshPanel.updateMeshConfigWidgets();
     },
@@ -1084,11 +1089,12 @@ var meshPanel = {
     addChild: function(drw) {
         var baseDrawing = bitsy.drawing.getEngineObject();
         var childDrawing = editor3d.getDrawingFromDrw(drw);
+        var baseConfig = b3d.meshConfig[baseDrawing.drw];
         // add child to 3d data
-        b3d.meshConfig[baseDrawing.drw].children = b3d.meshConfig[baseDrawing.drw].children || [];
-        b3d.meshConfig[baseDrawing.drw].children.push(childDrawing);
+        baseConfig.children = baseConfig.children || [];
+        baseConfig.children.push(b3d.getDefaultMeshProps(childDrawing));
         // add child to ui and select both its ui element as and its data as a current editing target
-        meshPanel.addSelectChildEl(childDrawing);
+        meshPanel.addSelectChildEl(childDrawing, baseConfig.children.length - 1);
         meshPanel.updateMeshConfigWidgets();
         // update 3d scene
         b3d.clearCachesMesh(baseDrawing.drw);
@@ -1102,13 +1108,12 @@ var meshPanel = {
         // delete child from 3d data
         var baseDrw = bitsy.drawing.getEngineObject().drw;
         // 'this' will be set to delete button element
-        var childDrw = this.value;
-        b3d.meshConfig[baseDrw].children = b3d.meshConfig[baseDrw].children.filter(function(childDrawing) {
-            return childDrawing.drw !== childDrw;
-        });
+        var childIndex = Number(this.value);
+        var childDrw = b3d.meshConfig[baseDrw].children[childIndex];
+        b3d.meshConfig[baseDrw].children.splice(childIndex, 1);
         
         // update 3d scene
-        b3d.clearCachesMesh(childDrw);
+        b3d.clearCachesMesh(childDrw); // todo: maybe this is redundant now that child configs are separated
         b3d.clearCachesMesh(baseDrw);
         // update serialized data
         bitsy.refreshGameData();
@@ -1137,6 +1142,16 @@ var meshPanel = {
         return title;
     },
 
+    getCurMeshConfig: function () {
+        // get the correct config object for currently selected mesh, distinguishing between base meshes and child meshes
+        var curDrwBase = bitsy.drawing.getEngineObject().drw;
+        if (meshPanel.curChildIndex < 0) {
+            return b3d.meshConfig[curDrwBase];
+        } else {
+            return b3d.meshConfig[curDrwBase].children[meshPanel.curChildIndex];
+        }
+    },
+
     updateAll: function () {
         meshPanel.onTabBase();
         meshPanel.updateCameraSettings();
@@ -1149,7 +1164,7 @@ var meshPanel = {
     },
 
     updateType: function () {
-        var type = b3d.meshConfig[meshPanel.curDrw].type;
+        var type = meshPanel.getCurMeshConfig().type;
         var prefix = meshPanel.subTypePrefixes.find(function (a) {return type.indexOf(a) !== -1});
         if (prefix) {
             var suffix = type.slice(prefix.length);
@@ -1174,18 +1189,18 @@ var meshPanel = {
             }
         });
 
-        b3d.meshConfig[meshPanel.curDrw].type = curMeshType;
-        b3d.clearCachesMesh(meshPanel.curDrw);
+        meshPanel.getCurMeshConfig().type = curMeshType;
+        b3d.clearCachesMesh(bitsy.drawing.getEngineObject().drw);
         bitsy.refreshGameData();
     },
 
     updateTransparency: function() {
-        meshPanel.transparencyCheckEl.checked = b3d.meshConfig[meshPanel.curDrw].transparency;
+        meshPanel.transparencyCheckEl.checked = meshPanel.getCurMeshConfig().transparency;
     },
 
     onChangeTransparency: function() {
-        b3d.meshConfig[meshPanel.curDrw].transparency = meshPanel.transparencyCheckEl.checked;
-        b3d.clearCachesTexture(meshPanel.curDrw);
+        meshPanel.getCurMeshConfig().transparency = meshPanel.transparencyCheckEl.checked;
+        b3d.clearCachesTexture(bitsy.drawing.getEngineObject().drw);
         b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
         // b3d.clearCaches(Object.values(b3d.caches));
         bitsy.refreshGameData();
@@ -1202,7 +1217,7 @@ var meshPanel = {
     },
 
     updateTransform: function (argument) {
-        var transform = b3d.meshConfig[meshPanel.curDrw].transform;
+        var transform = meshPanel.getCurMeshConfig().transform;
         if (transform) {
             meshPanel.transformValidatedNumbers = b3d.serializeTransform(transform);
         } else {
@@ -1220,16 +1235,12 @@ var meshPanel = {
         // only allows 5 digits after decimal point: this will be serialized consistently
         meshPanel.transformValidatedNumbers[index] = meshPanel.validateInputElementAsNumber(event.target, defaultVal, 5);
         
-        b3d.meshConfig[meshPanel.curDrw].transform = b3d.transformFromArray(meshPanel.transformValidatedNumbers);
+        meshPanel.getCurMeshConfig().transform = b3d.transformFromArray(meshPanel.transformValidatedNumbers);
 
         // force mesh instances to be recreated with the new transform by clearing the cache
-        b3d.clearCachesMesh(meshPanel.curDrw);
-        // make sure any parents that use this mesh as a child are recreated too
-        Object.keys(b3d.meshConfig).forEach(function (drw) {
-            if (b3d.meshConfig[drw].children && b3d.meshConfig[drw].children.indexOf(editor3d.getDrawingFromDrw(meshPanel.curDrw)) !== -1) {
-                b3d.clearCachesMesh(drw);
-            }
-        });
+        // filter caches by currently selected bitsy drawing rather than the local selection between base mesh and child meshes
+        // in the mesh panel, to make sure that parent mesh will be properly updated in any case
+        b3d.clearCachesMesh(bitsy.drawing.getEngineObject().drw);
 
         bitsy.refreshGameData();
     },

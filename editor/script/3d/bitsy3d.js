@@ -346,7 +346,7 @@ b3d.parseDataFromDialog = function () {
     // b3d.meshConfig should contain configuration for every drawing
     [].concat(Object.values(bitsy.tile), Object.values(bitsy.sprite), Object.values(bitsy.item)).forEach(function (drawing) {
         var parsedConfig = parsed && parsed.mesh[drawing.drw] || {};
-        b3d.meshConfig[drawing.drw] = b3d.parseMesh(drawing, parsedConfig);
+        b3d.meshConfig[drawing.drw] = b3d.parseMesh(drawing, parsedConfig, parsed);
     });
 
     // parse stacks
@@ -389,13 +389,30 @@ b3d.parseData = b3d.parseDataFromDialog;
 
 // all objects must have drawing, type, and transparency properties set by b3d.getDefaultMeshProps,
 // and other properties are optional
-b3d.parseMesh = function (drawing, parsedConfig) {
+b3d.parseMesh = function (drawing, parsedConfig, parsedData) {
     var config = b3d.getDefaultMeshProps(drawing);
     config.type = parsedConfig.type || config.type;
     config.transparency = parsedConfig.hasOwnProperty('transparency') ? parsedConfig.transparency : config.transparency;
     config.transform = parsedConfig.transform && b3d.transformFromArray(parsedConfig.transform.split(','));
     config.replacement = parsedConfig.replacement && b3d.getDrw(parsedConfig.replacement);
-    config.children = parsedConfig.children && parsedConfig.children.map(b3d.getDrw);
+    if (parsedConfig.children && parsedConfig.children.length > 0) {
+        config.children = [];
+        parsedConfig.children.forEach(function (c) {
+            var childDrw;
+            var childConfig;
+            if (typeof c === 'object' && c.drw) {
+                childDrw = c.drw;
+                childConfig = b3d.parseMesh(b3d.getDrw(childDrw), c, parsedData);
+            } else if (typeof c === 'string') {
+                // compatibility with previous data format
+                childDrw = c;
+                childConfig = b3d.parseMesh(b3d.getDrw(childDrw), parsedData.mesh[childDrw] || {}, parsedData);
+            }
+            if (childConfig) {
+                config.children.push(childConfig);
+            }
+        });
+    }
     return config;
 };
 
@@ -689,9 +706,12 @@ b3d.serializeMesh = function (meshConfig) {
     if (meshConfig.replacement) {
         configSerialized.replacement = meshConfig.replacement.drw;
     }
-    if (meshConfig.children) {
-        configSerialized.children = meshConfig.children.map(function (drawing) {
-            return drawing.drw;
+    if (meshConfig.children && meshConfig.children.length > 0) {
+        configSerialized.children = [];
+        meshConfig.children.forEach(function (childConfig) {
+            var childConfigSerialized = b3d.serializeMesh(childConfig);
+            childConfigSerialized.drw = childConfig.drawing.drw;
+            configSerialized.children.push(childConfigSerialized);
         });
     }
 
@@ -905,27 +925,26 @@ b3d.getMaterial = function (drawing, pal, transparency) {
     return b3d.getMaterialFromCache(key, [drawing, pal, transparency]);
 };
 
-b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, type) {
-    var mesh = b3d.meshTemplates[type].clone();
+b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, config) {
+    var mesh = b3d.meshTemplates[config.type].clone();
     mesh.makeGeometryUnique();
     mesh.isVisible = false;
-    mesh.material = b3d.getMaterial(drawing, pal, b3d.meshConfig[drawing.drw].transparency);
+    mesh.material = b3d.getMaterial(drawing, pal, config.transparency);
     // enable vertical tiling for towers
-    if (type.startsWith('tower')) {
+    if (config.type.startsWith('tower')) {
         mesh.material.diffuseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
     }
     return mesh;
 });
 
-b3d.getMesh = function (drawing, pal) {
-    var type = b3d.meshConfig[drawing.drw].type;
+b3d.getMesh = function (drawing, pal, config) {
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
     // include type in the key to account for cases when drawings that link to
     // the same 'drw' need to have different types when using with other hacks
-    var key = `${drw},${frame},${col},${pal},${type}`;
-    return b3d.getMeshFromCache(key, [drawing, pal, type]);
+    var key = `${drw},${frame},${col},${pal},${config.type},${config.transparency}`;
+    return b3d.getMeshFromCache(key, [drawing, pal, config]);
 };
 
 b3d.clearCaches = function (cachesArr, drw, frame, col, pal) {
@@ -1009,7 +1028,7 @@ b3d.update = function () {
     }).forEach(function (s) {
         var id = s.id;
         var oldMesh = b3d.sprites[id];
-        var newMesh = b3d.getMesh(s, bitsy.curPal());
+        var newMesh = b3d.getMesh(s, bitsy.curPal(), b3d.meshConfig[s.drw]);
         if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
             if (oldMesh) {
                 oldMesh.dispose();
@@ -1072,7 +1091,7 @@ b3d.update = function () {
             var key = `${roomId},${roomItem.id},${roomItem.x},${roomItem.y}`;
             var item = bitsy.item[roomItem.id];
             var oldMesh = b3d.items[key];
-            var newMesh = b3d.getMesh(item, bitsy.curPal());
+            var newMesh = b3d.getMesh(item, bitsy.curPal(), b3d.meshConfig[item.drw]);
             if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
                 if (oldMesh) {
                     oldMesh.dispose();
@@ -1111,17 +1130,18 @@ b3d.update = function () {
         }
         bitsy.room[roomId].tilemap.forEach(function(row, y) {
             row.forEach(function(tileId, x) {
+                var tile = bitsy.tile[tileId];
                 var oldMesh = b3d.tiles[roomId][y][x];
                 var newMesh = null;
                 if (tileId !== '0') {
-                    newMesh = b3d.getMesh(bitsy.tile[tileId], bitsy.curPal());
+                    newMesh = b3d.getMesh(tile, bitsy.curPal(), b3d.meshConfig[tile.drw]);
                 }
                 if (oldMesh !== newMesh && (newMesh !== (oldMesh && oldMesh.sourceMesh)))  {
                     if (oldMesh) {
                         oldMesh.dispose();
                     }
                     if (newMesh) {
-                        newMesh = b3d.addMeshInstance(newMesh, bitsy.tile[tileId], roomId, x, y);
+                        newMesh = b3d.addMeshInstance(newMesh, tile, roomId, x, y);
                     }
                     b3d.tiles[roomId][y][x] = newMesh;
                 }
@@ -1179,7 +1199,7 @@ b3d.addMeshInstance = function (mesh, drawing, roomId, x, y) {
         roomId: roomId,
     };
 
-    b3d.meshExtraSetup(drawing, instance);
+    b3d.meshExtraSetup(drawing, instance, b3d.meshConfig[drawing.drw]);
 
     return instance;
 };
@@ -1197,14 +1217,15 @@ b3d.addChildren = function (drawing, mesh) {
     // make sure the mesh we are about to add children to doesn't have a parent on its own to avoid ifinite loops
     if (!mesh.parent && b3d.meshConfig[drawing.drw].children) {
         // add specified drawings to the b3d.scene as child meshes
-        b3d.meshConfig[drawing.drw].children.forEach(function(childDrawing) {
-            var childMesh = b3d.getMesh(childDrawing, bitsy.curPal());
+        b3d.meshConfig[drawing.drw].children.forEach(function(childConfig) {
+            var childDrawing = childConfig.drawing;
+            var childMesh = b3d.getMesh(childDrawing, bitsy.curPal(), childConfig);
             childMesh = childMesh.createInstance();
             childMesh.position.x = mesh.position.x;
             childMesh.position.y = mesh.position.y;
             childMesh.position.z = mesh.position.z;
             mesh.addChild(childMesh);
-            b3d.meshExtraSetup(childDrawing, childMesh);
+            b3d.meshExtraSetup(childDrawing, childMesh, childConfig);
             // for editor version of the 3d hack allow all child meshes to move with their parent
             childMesh.unfreezeWorldMatrix();
         });
@@ -1235,10 +1256,10 @@ b3d.getBillboardMode = function () {
     return BABYLON.TransformNode.BILLBOARDMODE_Y | BABYLON.TransformNode.BILLBOARDMODE_Z;
 };
 
-b3d.meshExtraSetup = function (drawing, mesh) {
+b3d.meshExtraSetup = function (drawing, mesh, meshConfig) {
     b3d.addChildren(drawing, mesh);
-    if (b3d.meshConfig[drawing.drw].transform) {
-        mesh.setPreTransformMatrix(b3d.meshConfig[drawing.drw].transform);
+    if (meshConfig.transform) {
+        mesh.setPreTransformMatrix(meshConfig.transform);
     }
     if (mesh.sourceMesh.source.name === 'billboard') {
         mesh.billboardMode = b3d.getBillboardMode();
