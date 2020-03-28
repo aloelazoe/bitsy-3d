@@ -52,6 +52,7 @@ editor3d.cursor = {
 
 editor3d.init = function() {
     b3d.init();
+    b3d.scene.fogEnabled = false;
 
     editor3d.suggestReplacingNameTags();
 
@@ -245,6 +246,8 @@ editor3d.init = function() {
 
     // patch functions that are called when switching play mode on and off
     b3d.patch(bitsy, 'on_play_mode', null, function () {
+        b3d.scene.fogEnabled = true;
+        if (b3d.settings.enableFog) b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
         b3d.mainCamera.activate();
         document.getElementById('playModeWarning').style.display = 'block';
         document.getElementById('previewCameraDiv').style.display = 'none';
@@ -252,6 +255,8 @@ editor3d.init = function() {
     });
 
     b3d.patch(bitsy, 'on_edit_mode', null, function () {
+        b3d.scene.fogEnabled = false;
+        if (b3d.settings.enableFog) b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
         editor3d.reInit3dData();
         meshPanel.switchPreviewCamera(document.getElementById('previewCameraInput').checked);
         document.getElementById('playModeWarning').style.display = 'none';
@@ -1285,6 +1290,13 @@ var meshPanel = {
                 document.getElementById('settings3dGame'),
                 function (event) { b3d.applySettings(); }
             );
+            if (key === 'enableFog') {
+                controller.onInput = function (event) {
+                    b3d.applySettings();
+                    // force freezed materials to be recreated with new fog settings
+                    if (b3d.scene.activeCamera === b3d.mainCamera.ref) b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
+                };
+            }
             controller.update(b3d.settings);
             meshPanel.gameSettingsControllers.push(controller);
         });
@@ -1332,9 +1344,13 @@ var meshPanel = {
     switchPreviewCamera: function (on) {
         meshPanel.updatePreviewCameraButtons(on);
         if (on) {
+            b3d.scene.fogEnabled = true;
+            if (b3d.settings.enableFog) b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
             b3d.mainCamera.activate();
             meshPanel.onTabCamera();
         } else {
+            b3d.scene.fogEnabled = false;
+            if (b3d.settings.enableFog) b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
             editor3d.camera.activate();
         }
     },

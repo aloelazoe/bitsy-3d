@@ -7,7 +7,11 @@ var b3d = {
         engineAutoResize: true,
 
         clearColor: 0,
+
+        enableFog: false,
         fogColor: 0,
+        fogStart: 0,
+        fogEnd: 0,
 
         // todo: dialog position
 
@@ -427,6 +431,11 @@ b3d.applySettings = function () {
         // resize engine according to the canvas size
         b3d.engine.resize();
     }
+
+    // apply fog settings
+    b3d.scene.fogStart = b3d.settings.fogStart;
+    b3d.scene.fogEnd = b3d.settings.fogEnd;
+    b3d.scene.fogMode = b3d.settings.enableFog ? BABYLON.Scene.FOGMODE_LINEAR : BABYLON.Scene.FOGMODE_NONE;
 };
 
 // create a camera from serialized data
