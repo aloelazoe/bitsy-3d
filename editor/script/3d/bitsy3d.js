@@ -394,7 +394,7 @@ b3d.parseMesh = function (drawing, parsedConfig, parsedData) {
     config.type = parsedConfig.type || config.type;
     config.transparency = parsedConfig.hasOwnProperty('transparency') ? parsedConfig.transparency : config.transparency;
     config.transform = parsedConfig.transform && b3d.transformFromArray(parsedConfig.transform.split(','));
-    config.replacement = parsedConfig.replacement && b3d.getDrw(parsedConfig.replacement);
+    config.replacement = parsedConfig.replacement && b3d.getDrawingFromDrw(parsedConfig.replacement);
     if (parsedConfig.children && parsedConfig.children.length > 0) {
         config.children = [];
         parsedConfig.children.forEach(function (c) {
@@ -402,11 +402,11 @@ b3d.parseMesh = function (drawing, parsedConfig, parsedData) {
             var childConfig;
             if (typeof c === 'object' && c.drw) {
                 childDrw = c.drw;
-                childConfig = b3d.parseMesh(b3d.getDrw(childDrw), c, parsedData);
+                childConfig = b3d.parseMesh(b3d.getDrawingFromDrw(childDrw), c, parsedData);
             } else if (typeof c === 'string') {
                 // compatibility with previous data format
                 childDrw = c;
-                childConfig = b3d.parseMesh(b3d.getDrw(childDrw), parsedData.mesh[childDrw] || {}, parsedData);
+                childConfig = b3d.parseMesh(b3d.getDrawingFromDrw(childDrw), parsedData.mesh[childDrw] || {}, parsedData);
             }
             if (childConfig) {
                 config.children.push(childConfig);
@@ -605,7 +605,7 @@ b3d.transformFromArray = function (arr) {
 
 // helper function
 // finds drawing object by its full id i.g. 'SPR_A'
-b3d.getDrw = function (drw) {
+b3d.getDrawingFromDrw = function (drw) {
     var map;
     var typeAndId = drw.split('_');
     switch (typeAndId[0]) {

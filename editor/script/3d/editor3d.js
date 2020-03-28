@@ -708,22 +708,6 @@ editor3d.getNormal = function (mesh, faceId) {
     return normal;
 }; // editor3d.getNormal()
 
-editor3d.getDrawingFromDrw = function (drw) {
-    var type;
-    switch (drw.slice(0,3)) {
-        case 'SPR':
-            type = 'sprite';
-            break;
-        case 'TIL':
-            type = 'tile';
-            break;
-        case 'ITM':
-            type = 'item';
-            break;
-    }
-    return bitsy[type][drw.slice(4)];
-};
-
 editor3d.update = function () {
     b3d.update();
 
@@ -1088,7 +1072,7 @@ var meshPanel = {
 
     addChild: function(drw) {
         var baseDrawing = bitsy.drawing.getEngineObject();
-        var childDrawing = editor3d.getDrawingFromDrw(drw);
+        var childDrawing = b3d.getDrawingFromDrw(drw);
         var baseConfig = b3d.meshConfig[baseDrawing.drw];
         // add child to 3d data
         baseConfig.children = baseConfig.children || [];
