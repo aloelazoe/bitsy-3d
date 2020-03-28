@@ -202,10 +202,6 @@ b3d.lockPointer = function () {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    // remove borksy touch control fix that breaks camera controls
-    var touchTriggerEl = document.getElementById('touchTrigger');
-    if (touchTriggerEl) touchTriggerEl.parentElement.removeChild(touchTriggerEl);
-    
     if (bitsy.EditMode === undefined) {
         // if we are in exported game, patch bitsy with 3d functions
         b3d.patch(bitsy, 'startExportedGame', null, function () {
@@ -214,6 +210,11 @@ document.addEventListener('DOMContentLoaded', function() {
         b3d.patch(bitsy, 'update', null, function () {
             b3d.update();
             b3d.render();
+        });
+        b3d.patch(bitsy, 'onready', null, function () {        
+            // remove borksy touch control fix that breaks mouse camera controls
+            var touchTriggerEl = document.getElementById('touchTrigger');
+            if (touchTriggerEl) touchTriggerEl.parentElement.removeChild(touchTriggerEl);
         });
     }
 
