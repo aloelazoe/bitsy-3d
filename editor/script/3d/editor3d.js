@@ -1248,15 +1248,19 @@ var meshPanel = {
         } else if (isNaN(el.value)) {
             result = el.value = defaultVal;
         } else {
-            var dotIndex = el.value.indexOf('.');
-            if (digitsAfterDecimal && dotIndex !== -1) {
-                // only allows a set number of digits after a decimal point
-                result = el.value = el.value.slice(0, dotIndex) + el.value.slice(dotIndex, dotIndex + digitsAfterDecimal + 1);
-            } else {
-                result = el.value;
-            }
+            result = meshPanel.truncateNumber(el.value, digitsAfterDecimal);
         }
-        return Number(result);
+        return result;
+    },
+
+    truncateNumber: function (n, digitsAfterDecimal) {
+        var nString = typeof n === 'string' ? n : n.toString();
+        var dotIndex = nString.indexOf('.');
+        if (digitsAfterDecimal && dotIndex !== -1) {
+            return Number(nString.slice(0, dotIndex) + nString.slice(dotIndex, dotIndex + digitsAfterDecimal + 1));
+        } else {
+            return n;
+        }
     },
 
     addChildDropHandler: function (event) {
