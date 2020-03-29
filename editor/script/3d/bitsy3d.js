@@ -14,6 +14,7 @@ var b3d = {
         fogEnd: 0,
 
         // todo: dialog position
+        positionDialogBoxAtTheTop: false,
 
         tweenDistance: 1.5,
         tweenDuration: 150,
@@ -217,6 +218,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (touchTriggerEl) touchTriggerEl.parentElement.removeChild(touchTriggerEl);
         });
     }
+
+    var py;
+    // make position of the dialog box configurable through game settings
+    b3d.patch(dialogRenderer, 'DrawTextbox', function () {
+        py = bitsy.player().y;
+        bitsy.player().y = b3d.settings.positionDialogBoxAtTheTop ? bitsy.mapsize : 0;
+    }, function () {
+        bitsy.player().y = py;
+    });
 
     // adjust movement direction relative to the camera
     b3d.patch(bitsy, 'movePlayer',
