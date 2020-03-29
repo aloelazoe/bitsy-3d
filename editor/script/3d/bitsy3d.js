@@ -167,6 +167,7 @@ b3d.cameraDataModel = {
             },
         },
     },
+    controllableProperties: ['target', 'alpha', 'beta', 'radius'],
     traitEffects: {
         // to be used inside camera trait setters
         // 'this' should refer to camera object
@@ -487,12 +488,27 @@ b3d.createCamera = function (camData) {
     .forEach(function (entry) {
         var k = entry[0];
         var v = entry[1];
-        Object.defineProperty(camera, k, {
-            configurable: true,
-            enumerable: true,
-            get: function () { return this.ref[k]; },
-            set: function (a) { this.ref[k] = a; },
-        });
+        // if property is controllable by direct user input, we should keep a separate version of it
+        var isControllable = b3d.cameraDataModel.controllableProperties.indexOf(k) !== -1;
+        if (isControllable) {
+            var internalValue;
+            Object.defineProperty(camera, k, {
+                configurable: true,
+                enumerable: true,
+                get: function () { return internalValue; },
+                set: function (a) {
+                    internalValue = a;
+                    this.ref[k] = a;
+                },
+            });
+        } else {
+            Object.defineProperty(camera, k, {
+                configurable: true,
+                enumerable: true,
+                get: function () { return this.ref[k]; },
+                set: function (a) { this.ref[k] = a; },
+            });
+        }
         if (camData[k] !== undefined) {
             camera[k] = camData[k];
         } else {
@@ -508,17 +524,32 @@ b3d.createCamera = function (camData) {
     .forEach(function (entry) {
         var k = entry[0];
         var v = entry[1];
-        Object.defineProperty(camera, k, {
-            configurable: true,
-            enumerable: true,
-            get: function () { return this.ref[k]; },
-            set: function (a) { this.ref[k] = a; },
+        var isControllable = b3d.cameraDataModel.controllableProperties.indexOf(k) !== -1;
+        var internalVectorObject = {};
+        camera.ref[k] = new BABYLON.Vector3();
+        Object.keys(camera.ref[k]).forEach(function (vectorKey) {
+            if (isControllable) {
+                var val;
+                Object.defineProperty(internalVectorObject, vectorKey, {
+                    configurable: true,
+                    enumerable: true,
+                    get: function () { return val; },
+                    set: function (a) { val = camera.ref[k][vectorKey] = a; },
+                });
+            } else {
+                Object.defineProperty(internalVectorObject, vectorKey, {
+                    configurable: true,
+                    enumerable: true,
+                    get: function () { return camera.ref[k][vectorKey]; },
+                    set: function (a) { camera.ref[vectorKey] = a; },
+                });
+            }
         });
-        camera[k] = new BABYLON.Vector3();
+        camera[k] = internalVectorObject;
         if (camData[k]) {
-            camera[k].copyFromFloats(camData[k].x, camData[k].y, camData[k].z);
+            b3d.deepCopyObjectState(camera[k], camData[k]);
         } else {
-            camera[k].copyFromFloats(v.x, v.y, v.z);
+            b3d.deepCopyObjectState(camera[k], v);
         }
     });
 
@@ -586,6 +617,15 @@ b3d.createCamera = function (camData) {
                         b3d.cameraDataModel.traitEffects[t].call(this, false);
                     }
                 }, this);
+        },
+    });
+
+    Object.defineProperty(camera, 'resetRef', {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: function () {
+            b3d.deepCopyObjectState(this.ref, this, b3d.cameraDataModel.controllableProperties);
         },
     });
 
@@ -1291,9 +1331,10 @@ b3d.meshExtraSetup = function (drawing, mesh, meshConfig) {
     }
 };
 
-b3d.deepCopyObjectState = function (target, source) {
-    Object.keys(source).forEach(function (p) {
-        if (target[p] === undefined) {
+b3d.deepCopyObjectState = function (target, source, filter) {
+    var propertyList = filter || Object.keys(source);
+    propertyList.forEach(function (p) {
+        if (!(p in target) || !(p in source)) {
             return;
         } else if (typeof target[p] === 'object' && typeof source[p] === 'object') {
             b3d.deepCopyObjectState(target[p], source[p]);

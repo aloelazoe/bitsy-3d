@@ -165,11 +165,7 @@ editor3d.init = function() {
         }
         // update game camera ui and data when moving the camera in camera preview mode
         if (b3d.scene.activeCamera === b3d.mainCamera.ref && b3d.mainCamera.attachControl && (editor3d.cursor.isMouseDown || b3d.mainCamera.lockPointer && b3d.isPointerLocked)) {
-            meshPanel.updateCameraSettings();
-            if (!bitsy.isPlayMode) {
-                meshPanel.makeCameraPresetCustom();
-                bitsy.refreshGameData();
-            }
+            meshPanel.updateCameraSettingsControllables();
         }
     };
 
@@ -1353,6 +1349,8 @@ var meshPanel = {
             b3d.mainCamera.activate();
             meshPanel.onTabCamera();
         } else {
+            b3d.mainCamera.resetRef();
+            meshPanel.hideCameraSettingsControllables();
             b3d.scene.fogEnabled = false;
             if (b3d.settings.enableFog) b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
             editor3d.camera.activate();
@@ -1429,6 +1427,12 @@ var meshPanel = {
                     c.convertToData = function (a) { return Number(a) * Math.PI / 180; };
                 });
             }
+
+            // add special widgets for controllable properties
+            if (b3d.cameraDataModel.controllableProperties.indexOf(key) !== -1) {
+                controller.addControllableWidget();
+            }
+
             controller.update(b3d.mainCamera);
 
             meshPanel.cameraSettingsControllers.push(controller);
@@ -1458,7 +1462,10 @@ var meshPanel = {
         
         this.elementLabel = document.createElement('label');
         this.elementDiv.appendChild(this.elementLabel);
-        this.elementLabel.innerHTML = this.boundPropertyName.replace(/([A-Z])/g, " $1" ).toLowerCase() + ': ';
+        this.elementLabel.innerText = this.boundPropertyName.replace(/([A-Z])/g, " $1" ).toLowerCase() + ': ';
+
+        this.isControllable = false;
+        this.controllableObject = null;
 
         if (typeof this.defaultPropertyValue === 'object') {
             // create nested controllers recursively
@@ -1479,6 +1486,7 @@ var meshPanel = {
             if (typeof this.defaultPropertyValue === 'number') {
                 this.validate = meshPanel.validateInputElementAsNumber.bind(null, this.elementInput, 0, 5);
                 this.convertToData = function (a) { return Number(a); };
+                this.elementInput.size = 10;
             } else if (typeof this.defaultPropertyValue === 'boolean') {
                 this.elementInput.type = 'checkbox';
                 this.elementInput.style.display = 'inline';
@@ -1513,7 +1521,7 @@ var meshPanel = {
                 if (this.elementInput.type === 'checkbox') {
                     this.elementInput.checked = this.boundObject[this.boundPropertyName]
                 } else {
-                    this.elementInput.value = this.convertFromData(this.boundObject[this.boundPropertyName]);
+                    this.elementInput.value = meshPanel.truncateNumber(this.convertFromData(this.boundObject[this.boundPropertyName]), 5);
                 }
             }
         };
@@ -1524,6 +1532,88 @@ var meshPanel = {
         this.hide = function () {
             this.elementDiv.style.display = 'none';
         };
+
+        this.addControllableWidget = function () {
+            this.isControllable = true;
+            if (this.nestedControllers.length > 0) {
+                this.nestedControllers.forEach(function (c) { c.addControllableWidget(); });
+                return;
+            }
+
+            var thisController = this;
+
+            this.isControllable = true;
+
+            this.elementControllableLabel = document.createElement('label');
+            this.elementControllableLabel.style.fontSize = '80%';
+            this.elementDiv.appendChild(this.elementControllableLabel);
+
+            this.elementControllableApplyButton = document.createElement('button');
+            this.elementDiv.appendChild(this.elementControllableApplyButton);
+            this.elementControllableApplyButton.title = 'apply changes';
+            this.elementControllableApplyButton.innerHTML = `<i class="material-icons">content_copy</i>`;
+            var buttonStyle = "font-size: 70%; margin: 0px; padding: 0px; padding-bottom: 2px;"
+            this.elementControllableApplyButton.setAttribute('style', buttonStyle);
+            this.elementControllableApplyButton.onclick = function () {
+                if (!thisController.controllableObject) return;
+                // apply new value to bound object
+                thisController.boundObject[boundPropertyName] = thisController.controllableObject[boundPropertyName];
+                bitsy.refreshGameData();
+                thisController.update(thisController.boundObject);
+                thisController.hideControllableWidget();
+            };
+
+            this.elementControllableRevertButton = document.createElement('button');
+            this.elementDiv.appendChild(this.elementControllableRevertButton);
+            this.elementControllableRevertButton.title = 'revert changes';
+            this.elementControllableRevertButton.innerHTML = `<i class="material-icons">restore_page</i>`;
+            var buttonStyle = "font-size: 70%; margin: 0px; padding: 0px; padding-bottom: 2px;"
+            this.elementControllableRevertButton.setAttribute('style', buttonStyle);
+            this.elementControllableRevertButton.onclick = function () {
+                if (!thisController.controllableObject) return;
+                // restore value
+                thisController.controllableObject[boundPropertyName] = thisController.boundObject[boundPropertyName];
+                thisController.hideControllableWidget();
+            };
+
+            this.hideControllableWidget();
+        };
+
+        this.updateControllableWidget = function (boundObject, controllableObject) {
+            if (!this.isControllable || !controllableObject || !boundObject) return;
+            this.controllableObject = controllableObject;
+            this.boundObject = boundObject;
+            if (this.nestedControllers.length > 0) {
+                this.nestedControllers.forEach(function (c) { c.updateControllableWidget(boundObject[boundPropertyName], controllableObject[boundPropertyName]); });
+                return;
+            }
+            if (this.boundObject[boundPropertyName] === this.controllableObject[boundPropertyName]) {
+                this.hideControllableWidget();
+            } else {
+                this.showControllableWidget();
+                this.elementControllableLabel.innerText = meshPanel.truncateNumber(this.convertFromData(this.controllableObject[boundPropertyName]),5);
+            }
+        };
+
+        this.showControllableWidget = function () {
+            if (this.nestedControllers.length > 0) {
+                this.nestedControllers.forEach(function (c) { c.showControllableWidget() });
+                return;
+            }
+            this.elementControllableLabel.style.display = 'inline';
+            this.elementControllableApplyButton.style.display = 'inline';
+            this.elementControllableRevertButton.style.display = 'inline';
+        };
+
+        this.hideControllableWidget = function () {
+            if (this.nestedControllers.length > 0) {
+                this.nestedControllers.forEach(function (c) { c.hideControllableWidget() });
+                return;
+            }
+            this.elementControllableLabel.style.display = 'none';
+            this.elementControllableApplyButton.style.display = 'none';
+            this.elementControllableRevertButton.style.display = 'none';
+        };
     },
 
     updateCameraSettings: function () {
@@ -1531,6 +1621,20 @@ var meshPanel = {
         document.getElementById('settings3dCameraType').value = b3d.mainCamera.type;
         meshPanel.cameraSettingsControllers.forEach(function (controller) {
             controller.update(b3d.mainCamera);
+        });
+    },
+
+    updateCameraSettingsControllables: function () {
+        meshPanel.cameraSettingsControllers.forEach(function (controller) {
+            if (!controller.isControllable) return;
+            controller.updateControllableWidget(b3d.mainCamera, b3d.mainCamera.ref);
+        });
+    },
+
+    hideCameraSettingsControllables: function () {
+        meshPanel.cameraSettingsControllers.forEach(function (controller) {
+            if (!controller.isControllable) return;
+            controller.hideControllableWidget();
         });
     },
 
@@ -1564,6 +1668,7 @@ var meshPanel = {
         }
 
         meshPanel.updateCameraSettings();
+        meshPanel.hideCameraSettingsControllables();
         bitsy.refreshGameData();
     },
 
@@ -1600,6 +1705,7 @@ var meshPanel = {
         b3d.mainCamera = newCamera;
 
         meshPanel.updateCameraSettings();
+        meshPanel.hideCameraSettingsControllables();
         bitsy.refreshGameData();
     },
 }; // meshPanel
