@@ -131,6 +131,24 @@ b3d.cameraPresets = {
         followAvatar: true,
         lockPointer: true,
     },
+    'dungeon crawler': {
+        type: 'arc',
+        fov: 1,
+        inertia: 0.6,
+        alpha: -Math.PI/2,
+        beta: Math.PI/2,
+        radius: 0.5,
+        lowerRadiusLimit: 0.5,
+        upperRadiusLimit: 0.5,
+        upperBetaLimit: 0.75 * Math.PI,
+        lowerBetaLimit: 0.1 * Math.PI,
+        minZ: 0.001,
+        maxZ: 100,
+        attachControl: false,
+        followAvatar: true,
+        lockPointer: false,
+        useLeftAndRightToRotateByAngle: 0.5 * Math.PI,
+    },
 };
 
 b3d.cameraDataModel = {
@@ -155,9 +173,14 @@ b3d.cameraDataModel = {
                 wheelPrecision: 3,
                 upperBetaLimit: Math.PI/2,
                 lowerBetaLimit: 0,
+                rotationTweenTime: 250,
+                rotationTweenFunction: 'linear',
             },
             vector3: { target: {x: 8, z: 8, y: 0} },
-            trait: { attachControl: false },
+            trait: {
+                attachControl: false,
+                useLeftAndRightToRotateByAngle: 0
+            },
         },
         universal: {
             class: BABYLON.UniversalCamera,
@@ -191,6 +214,51 @@ b3d.cameraDataModel = {
                 b3d.sceneCanvas.addEventListener("click", b3d.lockPointer);
             } else if (v === false) {
                 b3d.sceneCanvas.removeEventListener("click", b3d.lockPointer);
+            }
+        },
+        useLeftAndRightToRotateByAngle: function (v) {
+            if (!this.hasOwnProperty('rotationState')) {
+                Object.defineProperty(this, 'rotationState', { value: {}});
+            }
+            if (v === 0 || v === false) {
+                // turn it off and return
+                if (this.rotationState.movePlayerOriginal) {
+                    // restore the original bitsy function
+                    bitsy.movePlayer = this.rotationState.movePlayerOriginal;
+                }
+                if (this.rotationState.cameraUpdateOriginal) {
+                    this.ref.update = this.rotationState.cameraUpdateOriginal;
+                }
+                return;
+            }
+            if (!this.rotationState.movePlayerOriginal || !this.rotationState.cameraUpdateOriginal) {
+                this.rotationState.movePlayerOriginal = bitsy.movePlayer;
+                var thisCamera = this;
+                b3d.patch(bitsy, 'movePlayer', function () {
+                    if (thisCamera.rotationState.isTweening) {
+                        // prevent any movement by resetting bitsy direction when camera is rotating
+                        bitsy.curPlayerDirection = bitsy.Direction.None;
+                    } else if (bitsy.curPlayerDirection === bitsy.Direction.Left || bitsy.curPlayerDirection === bitsy.Direction.Right) {
+                        // if it isn't, check if it should start rotating
+                        thisCamera.rotationState.isTweening = true;
+                        var dir = bitsy.curPlayerDirection === bitsy.Direction.Left ? 1 : -1;
+                        thisCamera.rotationState.tweenStartingRotation = thisCamera.ref.alpha;
+                        thisCamera.rotationState.tweenStartingTime = bitsy.prevTime;
+                        thisCamera.rotationState.tweenRotationAmount = dir * thisCamera.useLeftAndRightToRotateByAngle;
+                        bitsy.curPlayerDirection = bitsy.Direction.None;
+                    }
+                });
+                // tween camera rotation
+                b3d.patch(thisCamera.ref, 'update', null, function () {
+                    var rotationState = thisCamera.rotationState;
+                    var tweenFunction = b3d.tweenFunctions[thisCamera.rotationTweenFunction] || b3d.tweenFunctions['linear'];
+                    var tweenPercent = Math.min(tweenFunction(((bitsy.prevTime - rotationState.tweenStartingTime) / thisCamera.rotationTweenTime)), 1);
+                    if (rotationState.isTweening) {
+                        var tweenPercent = Math.min(tweenFunction(((bitsy.prevTime - rotationState.tweenStartingTime) / thisCamera.rotationTweenTime)), 1);
+                        thisCamera.ref.alpha = rotationState.tweenStartingRotation + (rotationState.tweenRotationAmount * tweenPercent);
+                        if (tweenPercent === 1) rotationState.isTweening = false;
+                    }
+                });
             }
         },
     },
