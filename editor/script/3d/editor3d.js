@@ -24,6 +24,10 @@ var editor3d = {
     camera: null,
 
     takeScreenshot: false,
+
+    // lists of game settings and camera properties that require special treatment when generating ui elements
+    propertyListIgnore: ['clearColor', 'fogColor', 'tweenFunction', 'rotationTweenTime', 'rotationTweenFunction'],
+    propertyListRadiansToDegrees: ['alpha', 'beta', 'upperBetaLimit', 'lowerBetaLimit'],
 };
 
 editor3d.cursor = {
@@ -1281,7 +1285,7 @@ var meshPanel = {
     // generate ui for selected 3d game settings
     initGameSettings: function () {
         Object.keys(b3d.settings).filter(function (key){
-            return ['clearColor', 'fogColor', 'tweenFunction'].indexOf(key) === -1
+            return editor3d.propertyListIgnore.indexOf(key) === -1
         })
         .forEach(function (key) {
         // ['engineWidth', 'engineHeight', 'engineAutoResize'].forEach(function (key) {
@@ -1400,11 +1404,11 @@ var meshPanel = {
         var allCameraProps = {};
         ['trait', 'value', 'vector3'].forEach(function (propType) {
             Object.entries(b3d.cameraDataModel.commonProperties[propType] || {}).forEach(function (propEntry) {
-                allCameraProps[propEntry[0]] = propEntry[1];
+                if (editor3d.propertyListIgnore.indexOf(propEntry[0]) === -1) allCameraProps[propEntry[0]] = propEntry[1];
             });
             Object.values(b3d.cameraDataModel.cameraTypes).forEach(function (cameraTypeObj) {
                 Object.entries(cameraTypeObj[propType] || {}).forEach(function (propEntry) {
-                    allCameraProps[propEntry[0]] = propEntry[1];
+                    if (editor3d.propertyListIgnore.indexOf(propEntry[0]) === -1) allCameraProps[propEntry[0]] = propEntry[1];
                 });
             });
         });
@@ -1418,7 +1422,7 @@ var meshPanel = {
 
             // customize specific properties
             // display angles in degrees
-            if (['alpha', 'beta', 'upperBetaLimit', 'lowerBetaLimit'].indexOf(key) !== -1) {
+            if (editor3d.propertyListRadiansToDegrees.indexOf(key) !== -1) {
                 controller.convertFromData = function (a) { return Number(a) * 180 / Math.PI; };
                 controller.convertToData = function (a) { return Number(a) * Math.PI / 180; };
             } else if (key === 'rotation') {
