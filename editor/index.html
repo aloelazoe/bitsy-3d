@@ -431,6 +431,10 @@
 								<label for="meshTransparencyCheck">transparency</label>:
 								<input type="checkbox" id="meshTransparencyCheck" style="display:initial" onchange="meshPanel.onChangeTransparency();">
 							</div>
+							<div id="meshHidden" title="check if this drawing should only be visible in the editor">
+								<label for="meshHiddenCheck">hidden</label>:
+								<input type="checkbox" id="meshHiddenCheck" style="display:initial" onchange="meshPanel.onChangeHidden();">
+							</div>
 
 							<input type="checkbox" id="transformCheck" onclick="meshPanel.onToggleTransform();" />
 							<label title="translation (offset), rotation and scale settings" for="transformCheck">

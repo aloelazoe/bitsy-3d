@@ -51,10 +51,6 @@ var b3d = {
     avatarRef: null,
     avatarNode: null,
 
-    // when set to true, drawing replacements won't be applied,
-    // and drawings set to have empty meshes will have their default visible meshes instead
-    debugView: false,
-
     sceneCanvas: null,
     textCanvas: null,
     textContext: null,
@@ -479,6 +475,7 @@ b3d.parseMesh = function (drawing, parsedConfig, parsedData) {
     config.transparency = parsedConfig.hasOwnProperty('transparency') ? parsedConfig.transparency : config.transparency;
     config.transform = parsedConfig.transform && b3d.transformFromArray(parsedConfig.transform.split(','));
     config.replacement = parsedConfig.replacement && b3d.getDrawingFromDrw(parsedConfig.replacement);
+    config.hidden = parsedConfig.hasOwnProperty('hidden') ? parsedConfig.hidden : config.hidden;
     if (parsedConfig.children && parsedConfig.children.length > 0) {
         config.children = [];
         parsedConfig.children.forEach(function (c) {
@@ -705,6 +702,7 @@ b3d.getDefaultMeshProps = function (drawing) {
         drawing: drawing,
         type: b3d.getDefaultMeshType(drawing),
         transparency: b3d.getDefaultTransparency(drawing),
+        hidden: false,
     };
 };
 
@@ -834,6 +832,9 @@ b3d.serializeMesh = function (meshConfig) {
     if (meshConfig.replacement) {
         configSerialized.replacement = meshConfig.replacement.drw;
     }
+    if (meshConfig.hidden) {
+        configSerialized.hidden = meshConfig.hidden;
+    }
     if (meshConfig.children && meshConfig.children.length > 0) {
         configSerialized.children = [];
         meshConfig.children.forEach(function (childConfig) {
@@ -959,9 +960,6 @@ b3d.initMeshTemplates = function () {
 
     meshTemplates.wedge = wedgeMesh;
 
-    // empty mesh for making drawings invisible
-    var emptyMesh = new BABYLON.Mesh("emptyMesh", b3d.scene);
-    meshTemplates.empty = emptyMesh;
     return meshTemplates;
 }; // b3d.initMeshTemplates()
 
@@ -1026,11 +1024,10 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparenc
 });
 
 b3d.getTexture = function (drawing, pal, transparency) {
-    if (!b3d.debugView) {
-        // apply drawing replacement
-        var altDrawing = b3d.meshConfig[drawing.drw].replacement;
-        drawing = altDrawing && altDrawing || drawing;
-    }
+    // apply drawing replacement
+    var altDrawing = b3d.meshConfig[drawing.drw].replacement;
+    drawing = altDrawing && altDrawing || drawing;
+
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
@@ -1313,7 +1310,11 @@ b3d.isRoomVisible = function (roomId) {
 };
 
 b3d.addMeshInstance = function (mesh, drawing, roomId, x, y) {
-    instance = mesh.createInstance();
+    if (b3d.meshConfig[drawing.drw].hidden && (bitsy.EditMode === undefined || bitsy.b3d.scene.activeCamera === b3d.mainCamera.ref)) {
+        instance = new BABYLON.TransformNode();
+    } else {
+        instance = mesh.createInstance();
+    }
     instance.position.x = x;
     instance.position.z = bitsy.mapsize - 1 - y;
     instance.position.y = b3d.stackPosOfRoom[roomId] && b3d.stackPosOfRoom[roomId].pos || 0;
@@ -1352,7 +1353,8 @@ b3d.addChildren = function (drawing, mesh) {
             childMesh.position.x = mesh.position.x;
             childMesh.position.y = mesh.position.y;
             childMesh.position.z = mesh.position.z;
-            mesh.addChild(childMesh);
+            // mesh.addChild(childMesh);
+            childMesh.setParent(mesh);
             b3d.meshExtraSetup(childDrawing, childMesh, childConfig);
             // for editor version of the 3d hack allow all child meshes to move with their parent
             childMesh.unfreezeWorldMatrix();
@@ -1389,7 +1391,7 @@ b3d.meshExtraSetup = function (drawing, mesh, meshConfig) {
     if (meshConfig.transform) {
         mesh.setPreTransformMatrix(meshConfig.transform);
     }
-    if (mesh.sourceMesh.source.name === 'billboard') {
+    if (mesh.sourceMesh && mesh.sourceMesh.source.name === 'billboard') {
         mesh.billboardMode = b3d.getBillboardMode();
     } else if (!drawing.drw.startsWith('SPR')) {
         mesh.freezeWorldMatrix();

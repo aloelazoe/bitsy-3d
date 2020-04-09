@@ -23,7 +23,12 @@ b3d.parseDataFromNameTags = function () {
 
 b3d.parseMeshConfigFromNameTags = function (drawing) {
     var config = b3d.getDefaultMeshProps(drawing);
-    config.type = b3d.parseMeshTag(drawing) || config.type;
+    var type = b3d.parseMeshTag(drawing);
+    if (type === 'empty') {
+        config.hidden = true;
+    } else {
+        config.type = type || config.type;
+    }
     config.transparency = b3d.parseTransparentTag(drawing) === undefined && config.transparency || b3d.parseTransparentTag(drawing);
     config.transform = b3d.parseTransformTags(drawing);
     config.replacement = b3d.parseDrawTag(drawing);
@@ -146,11 +151,10 @@ b3d.parseMeshTag = function (drawing) {
     var name = drawing.name || '';
     var meshMatch = name.match(/#mesh\((.+?)\)/);
     if (meshMatch) {
-        if (b3d.meshTemplates[meshMatch[1]]) {
-            // ignore empty mesh tag if we are in debug view
-            if (!b3d.debugView || meshMatch[1] !== 'empty') {
-                return meshMatch[1];
-            }
+        if (meshMatch[1] === 'empty') {
+            return 'empty';
+        } else if (b3d.meshTemplates[meshMatch[1]]) {
+            return meshMatch[1];
         } else {
             // if the specified mesh template doesn't exist,
             // display error message, but continue execution

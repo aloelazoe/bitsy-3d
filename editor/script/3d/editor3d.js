@@ -849,6 +849,7 @@ var meshPanel = {
     subTypeSelectEl: null,
 
     transparencyCheckEl: null,
+    hiddenCheckEl: null,
 
     // this order corresponds with the order of values in serizlized transform
     transformElementNamesOrdered: [
@@ -865,6 +866,7 @@ var meshPanel = {
         meshPanel.typeSelectEl = document.getElementById('meshTypeSelect');
         meshPanel.subTypeSelectEl = document.getElementById('meshSubTypeSelect');
         meshPanel.transparencyCheckEl = document.getElementById('meshTransparencyCheck');
+        meshPanel.hiddenCheckEl = document.getElementById('meshHiddenCheck');
 
         // find transform input elements
         meshPanel.transformElementNamesOrdered.forEach(function (id) {
@@ -921,6 +923,7 @@ var meshPanel = {
     updateMeshConfigWidgets: function() {
         meshPanel.updateType();
         meshPanel.updateTransparency();
+        meshPanel.updateHidden();
         meshPanel.updateTransform();
     },
 
@@ -1187,11 +1190,21 @@ var meshPanel = {
         meshPanel.transparencyCheckEl.checked = meshPanel.getCurMeshConfig().transparency;
     },
 
+    updateHidden: function() {
+        meshPanel.hiddenCheckEl.checked = meshPanel.getCurMeshConfig().hidden;
+    },
+
     onChangeTransparency: function() {
         meshPanel.getCurMeshConfig().transparency = meshPanel.transparencyCheckEl.checked;
         b3d.clearCachesTexture(bitsy.drawing.getEngineObject().drw);
         b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
         // b3d.clearCaches(Object.values(b3d.caches));
+        bitsy.refreshGameData();
+    },
+
+    onChangeHidden: function() {
+        meshPanel.getCurMeshConfig().hidden = meshPanel.hiddenCheckEl.checked;
+        b3d.clearCaches([b3d.caches.mesh], bitsy.drawing.getEngineObject().drw);
         bitsy.refreshGameData();
     },
 
