@@ -92,24 +92,24 @@ this.Localize = function() {
 }
 
 function getEditorLanguage() {
-	if(localStorage.editor_language == null) {
+	if(localStorage.bitsy_3d_editor_language == null) {
 		var browserLanguage = (navigator.languages ? navigator.languages[0] : navigator.language).split("-")[0];
-		localStorage.editor_language = browserLanguage;
+		localStorage.bitsy_3d_editor_language = browserLanguage;
 	}
 
 	// fallback to english
-	if(localizationStrings[localStorage.editor_language] == null) {
-		localStorage.editor_language = "en";
+	if(localizationStrings[localStorage.bitsy_3d_editor_language] == null) {
+		localStorage.bitsy_3d_editor_language = "en";
 	}
 
-	return localStorage.editor_language;
+	return localStorage.bitsy_3d_editor_language;
 }
 this.GetLanguage = function() {
 	return getEditorLanguage();
 }
 
 function saveEditorLanguage(language) {
-	localStorage.editor_language = language;
+	localStorage.bitsy_3d_editor_language = language;
 }
 
 function getLanguageList() {
