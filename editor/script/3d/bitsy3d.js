@@ -454,8 +454,11 @@ b3d.parseDataFromDialog = function () {
     if (parsed && parsed.camera) {
         if (typeof parsed.camera === 'string') {
             b3d.curCameraPreset = b3d.cameraPresets[parsed.camera] ? parsed.camera : b3d.defaultCameraPreset;
+            b3d.mainCamera = b3d.createCamera(b3d.cameraPresets[b3d.curCameraPreset]);
+        } else if (typeof parsed.camera === 'object') {
+            b3d.curCameraPreset = null;
+            b3d.mainCamera = b3d.createCamera(parsed.camera);
         }
-        b3d.mainCamera = b3d.createCamera(b3d.cameraPresets[b3d.curCameraPreset] || parsed.camera);
     } else {
         b3d.curCameraPreset = b3d.defaultCameraPreset;
         b3d.mainCamera = b3d.createCamera(b3d.cameraPresets[b3d.defaultCameraPreset]);
