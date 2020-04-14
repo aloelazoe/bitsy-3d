@@ -105,6 +105,8 @@ function sortedRoomIdList() {
 function sortedDialogIdList() {
 	var keyList = Object.keys(dialog);
 	keyList.splice(keyList.indexOf("title"), 1);
+	// bitsy 3d addition: filter out dialog id for serialized 3d data
+	keyList.splice(keyList.indexOf("DATA3D"), 1);
 	var keyObj = {};
 	for (var i = 0; i < keyList.length; i++) {
 		keyObj[keyList[i]] = {};
