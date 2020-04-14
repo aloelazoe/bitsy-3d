@@ -413,7 +413,7 @@ b3d.init = function () {
 
 // return true if data was parsed successfully and false if it was initiazlied with default values
 b3d.parseDataFromDialog = function () {
-    var serialized = bitsy.dialog['DATA3D'];
+    var serialized = bitsy.dialog['DATA3D'] && bitsy.dialog['DATA3D'].src;
     var parsed;
     if (serialized) {
         // remove bitsy multiline dialog tokens if there are any
@@ -813,7 +813,10 @@ b3d.serializeDataAsDialog = function () {
         stack: stackSerialized
     }, null, 2);
     // console.log(result);
-    bitsy.dialog['DATA3D'] = '"""\n' + result + '\n"""';
+    bitsy.dialog['DATA3D'] = {
+        src:'"""\n' + result + '\n"""',
+        name: null,
+    };
 }; // b3d.serializeDataAsDialog
 
 b3d.serializeData = b3d.serializeDataAsDialog;
