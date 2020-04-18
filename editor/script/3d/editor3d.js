@@ -1038,7 +1038,7 @@ var meshPanel = {
         divEl.appendChild(labelEl);
         labelEl.appendChild(spanEl);
 
-        var inputId = 'childMesh' + drawing.drw;        
+        var inputId = 'childMesh' + childIndex;        
         labelEl.htmlFor = inputId;
         spanEl.innerHTML = meshPanel.getDrawingFullTitle(drawing);
         
