@@ -22,6 +22,11 @@ var b3d = {
 
         movementHoldInterval: 150,
         movementSecondStepInterval: 150,
+
+        unboundSpeed: 1,
+        unboundCollisionDistance: 0.3,
+
+        showMovementTargetDebugMesh: false,
     },
 
     mainCamera: null,
@@ -64,6 +69,8 @@ var b3d = {
     isPointerLocked: false,
 
     defaultCameraPreset: 'orbiting follower',
+
+    movementTargetDebugMesh: null,
 };
 
 b3d.tweenFunctions = {
@@ -294,33 +301,98 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // adjust movement direction relative to the camera
-    b3d.patch(bitsy, 'movePlayer',
-        function () {
-            var rotationTable = {};
-            rotationTable[bitsy.Direction.Up] = bitsy.Direction.Left;
-            rotationTable[bitsy.Direction.Left] = bitsy.Direction.Down;
-            rotationTable[bitsy.Direction.Down] = bitsy.Direction.Right;
-            rotationTable[bitsy.Direction.Right] = bitsy.Direction.Up;
-            rotationTable[bitsy.Direction.None] = bitsy.Direction.None;
+    // b3d.patch(bitsy, 'movePlayer',
+    //     function () {
+    //         var rotationTable = {};
+    //         rotationTable[bitsy.Direction.Up] = bitsy.Direction.Left;
+    //         rotationTable[bitsy.Direction.Left] = bitsy.Direction.Down;
+    //         rotationTable[bitsy.Direction.Down] = bitsy.Direction.Right;
+    //         rotationTable[bitsy.Direction.Right] = bitsy.Direction.Up;
+    //         rotationTable[bitsy.Direction.None] = bitsy.Direction.None;
 
-            b3d.rawDirection = bitsy.curPlayerDirection;
+    //         b3d.rawDirection = bitsy.curPlayerDirection;
 
-            var rotatedDirection = bitsy.curPlayerDirection;
-            var ray = b3d.scene.activeCamera.getForwardRay().direction;
-            var ray2 = new BABYLON.Vector2(ray.x, ray.z);
-            ray2.normalize();
-            var a = (Math.atan2(ray2.y, ray2.x) / Math.PI + 1) * 2 + 0.5;
-            if (a < 0) {
-                a += 4;
-            }
-            for (var i = 0; i < a; ++i) {
-                rotatedDirection = rotationTable[rotatedDirection];
-            }
-            bitsy.curPlayerDirection = rotatedDirection;
-        },
-        function () {
-            bitsy.curPlayerDirection = b3d.rawDirection;
-    });
+    //         var rotatedDirection = bitsy.curPlayerDirection;
+    //         var ray = b3d.scene.activeCamera.getForwardRay().direction;
+    //         var ray2 = new BABYLON.Vector2(ray.x, ray.z);
+    //         ray2.normalize();
+    //         var a = (Math.atan2(ray2.y, ray2.x) / Math.PI + 1) * 2 + 0.5;
+    //         if (a < 0) {
+    //             a += 4;
+    //         }
+    //         for (var i = 0; i < a; ++i) {
+    //             rotatedDirection = rotationTable[rotatedDirection];
+    //         }
+    //         bitsy.curPlayerDirection = rotatedDirection;
+    //     },
+    //     function () {
+    //         bitsy.curPlayerDirection = b3d.rawDirection;
+    // });
+
+    // testing unbound controller: replace movePlayer function
+    bitsy.movePlayer = function (direction) {
+        if (bitsy.player().room == null || !Object.keys(bitsy.room).includes(bitsy.player().room)) {
+            return; // player room is missing or invalid.. can't move them!
+        }
+
+        // determine input angle
+        var inputAngle;
+        switch (bitsy.curPlayerDirection) {
+            case bitsy.Direction.Left:
+                inputAngle = Math.PI / -2;
+                break;
+            case bitsy.Direction.Right:
+                inputAngle = Math.PI / 2;
+                break;
+            case bitsy.Direction.Up:
+                inputAngle = 0;
+                break;
+            case bitsy.Direction.Down:
+                inputAngle = Math.PI;
+                break;
+        }
+
+        // determine camera direction as a vector because 'rotation' property doesn't work consistently between different camera types
+        var camDir3 = b3d.mainCamera.ref.getDirection(BABYLON.Vector3.Forward());
+        var camDir = new BABYLON.Vector2(camDir3.x, camDir3.z);
+        camDir.normalize();
+        
+        // knowing x and y components of a normalized vector we can find its angle using atan function
+        // x = cos(A), y = sin(A); A = atan(sin(A)/cos(A))
+        // unlike atan function, atan2 handles we-need-to-divide-by-cos-but-its-0 cases
+        // and also resovles into a single correct angle instead of giving two possibilities
+        var camAngle = Math.atan2(camDir.x, camDir.y);
+
+        // adjust input angle according to camera angle
+        var dirAngle = camAngle + inputAngle - (Math.PI / 2);
+
+        // determine movement vector according to camera and input angles and collision check distance
+        var dirX = Math.cos(dirAngle);
+        var dirY = Math.sin(dirAngle);
+
+        // project a target coordinate from the current player position
+        var targetX = Math.round(bitsy.player().x + (dirX * b3d.settings.unboundCollisionDistance));
+        var targetY = Math.round(bitsy.player().y + (dirY * b3d.settings.unboundCollisionDistance));
+
+        // update debug mesh position to visualize our target coordinate
+        if (b3d.movementTargetDebugMesh && b3d.settings.showMovementTargetDebugMesh) {
+            b3d.movementTargetDebugMesh.position.x = targetX;
+            b3d.movementTargetDebugMesh.position.z = bitsy.mapsize - 1 - targetY;
+            b3d.movementTargetDebugMesh.isVisible = true;
+        } else {
+            b3d.movementTargetDebugMesh.isVisible = false;
+        }
+
+        // check for collisions and move the avatar
+        var sprId = getSpriteAt(targetX, targetY);
+        var boundary = targetX < 0 || targetX >= bitsy.mapsize || targetY < 0 || targetY >= bitsy.mapsize;
+
+        if ( (sprId === bitsy.player().id || !sprId) && !boundary && !isWall(targetX, targetY) ) {
+            bitsy.player().x += dirX * bitsy.deltaTime / 1000 * b3d.settings.unboundSpeed;
+            bitsy.player().y += dirY * bitsy.deltaTime / 1000 * b3d.settings.unboundSpeed;
+            bitsy.didPlayerMoveThisFrame = true;
+        }
+    };
 });
 
 // helper function to patch functions
@@ -409,6 +481,15 @@ b3d.init = function () {
             b3d.isPointerLocked = false;
         }
     });
+
+    // add mesh for debugging player controller
+    b3d.movementTargetDebugMesh = BABYLON.MeshBuilder.CreateBox('collisionDebug', { size: 1.1 }, b3d.scene);
+    b3d.movementTargetDebugMesh.isPickable = false;
+    var movementTargetDebugMat = new BABYLON.StandardMaterial("movementTargetDebugMat", b3d.scene);
+    movementTargetDebugMat.ambientColor = new BABYLON.Color3(1, 1, 1);
+    movementTargetDebugMat.alpha = 0.5;
+    b3d.movementTargetDebugMesh.material = movementTargetDebugMat;
+    b3d.movementTargetDebugMesh.isVisible = false;
 };
 
 // return true if data was parsed successfully and false if it was initiazlied with default values
