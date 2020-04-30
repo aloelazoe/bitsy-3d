@@ -1399,6 +1399,9 @@ b3d.meshExtraSetup = function (drawing, mesh, meshConfig) {
     b3d.addChildren(drawing, mesh);
     if (meshConfig.transform) {
         mesh.setPreTransformMatrix(meshConfig.transform);
+        if (drawing === bitsy.player()) {
+            b3d.avatarNode.setPreTransformMatrix(meshConfig.transform);
+        }
     }
     if (mesh.sourceMesh && mesh.sourceMesh.source.name === 'billboard') {
         mesh.billboardMode = b3d.getBillboardMode();
