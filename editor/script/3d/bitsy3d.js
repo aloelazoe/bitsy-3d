@@ -1316,7 +1316,8 @@ b3d.isRoomVisible = function (roomId) {
 };
 
 b3d.addMeshInstance = function (mesh, drawing, roomId, x, y) {
-    if (b3d.meshConfig[drawing.drw].hidden && (bitsy.EditMode === undefined || bitsy.b3d.scene.activeCamera === b3d.mainCamera.ref)) {
+    var instance;
+    if (b3d.meshConfig[drawing.drw].hidden && (bitsy.EditMode === undefined || b3d.scene.activeCamera === b3d.mainCamera.ref)) {
         instance = new BABYLON.TransformNode();
     } else {
         instance = mesh.createInstance();
@@ -1355,11 +1356,14 @@ b3d.addChildren = function (drawing, mesh) {
         b3d.meshConfig[drawing.drw].children.forEach(function(childConfig) {
             var childDrawing = childConfig.drawing;
             var childMesh = b3d.getMesh(childDrawing, bitsy.curPal(), childConfig);
-            childMesh = childMesh.createInstance();
+            if (childConfig.hidden && (bitsy.EditMode === undefined || b3d.scene.activeCamera === b3d.mainCamera.ref)) {
+                childMesh = new BABYLON.TransformNode();
+            } else {
+                childMesh = childMesh.createInstance();
+            }
             childMesh.position.x = mesh.position.x;
             childMesh.position.y = mesh.position.y;
             childMesh.position.z = mesh.position.z;
-            // mesh.addChild(childMesh);
             childMesh.setParent(mesh);
             b3d.meshExtraSetup(childDrawing, childMesh, childConfig);
             // for editor version of the 3d hack allow all child meshes to move with their parent
