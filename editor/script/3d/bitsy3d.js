@@ -426,7 +426,7 @@ b3d.parseDataFromDialog = function () {
     // b3d.meshConfig should contain configuration for every drawing
     [].concat(Object.values(bitsy.tile), Object.values(bitsy.sprite), Object.values(bitsy.item)).forEach(function (drawing) {
         var parsedConfig = parsed && parsed.mesh[drawing.drw] || {};
-        b3d.meshConfig[drawing.drw] = b3d.parseMesh(drawing, parsedConfig, parsed);
+        b3d.meshConfig[drawing.drw] = b3d.parseMesh(drawing, parsedConfig);
     });
 
     // parse stacks
@@ -472,7 +472,7 @@ b3d.parseData = b3d.parseDataFromDialog;
 
 // all objects must have drawing, type, and transparency properties set by b3d.getDefaultMeshProps,
 // and other properties are optional
-b3d.parseMesh = function (drawing, parsedConfig, parsedData) {
+b3d.parseMesh = function (drawing, parsedConfig) {
     var config = b3d.getDefaultMeshProps(drawing);
     config.type = parsedConfig.type || config.type;
     config.transparency = parsedConfig.hasOwnProperty('transparency') ? parsedConfig.transparency : config.transparency;
@@ -486,11 +486,10 @@ b3d.parseMesh = function (drawing, parsedConfig, parsedData) {
             var childConfig;
             if (typeof c === 'object' && c.drw) {
                 childDrw = c.drw;
-                childConfig = b3d.parseMesh(b3d.getDrawingFromDrw(childDrw), c, parsedData);
+                childConfig = b3d.parseMesh(b3d.getDrawingFromDrw(childDrw), c);
             } else if (typeof c === 'string') {
-                // compatibility with previous data format
                 childDrw = c;
-                childConfig = b3d.parseMesh(b3d.getDrawingFromDrw(childDrw), parsedData.mesh[childDrw] || {}, parsedData);
+                childConfig = b3d.parseMesh(b3d.getDrawingFromDrw(childDrw), {});
             }
             if (childConfig) {
                 config.children.push(childConfig);

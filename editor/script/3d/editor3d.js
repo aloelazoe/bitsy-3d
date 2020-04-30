@@ -223,12 +223,20 @@ editor3d.init = function() {
     );
 
     // update b3d.meshConfig when drawings are added, duplicated and deleted
-    ['newDrawing', 'duplicateDrawing'].forEach(function (f) {
-        b3d.patch(bitsy, f, null, function () {
+    b3d.patch(bitsy, 'newDrawing', null, function () {
             var drawing = bitsy.drawing.getEngineObject();
             b3d.meshConfig[drawing.drw] = b3d.getDefaultMeshProps(drawing);
-        });
     });
+    var duplicatedFromThisDrw;
+    b3d.patch(bitsy, 'duplicateDrawing',
+        function () {
+            duplicatedFromThisDrw = bitsy.drawing.getEngineObject().drw;
+        },
+        function () {
+            var drawing = bitsy.drawing.getEngineObject();
+            b3d.meshConfig[drawing.drw] = b3d.parseMesh(drawing, b3d.serializeMesh(b3d.meshConfig[duplicatedFromThisDrw]));
+        }
+    );
     b3d.patch(bitsy, 'deleteDrawing',
        function () {
             b3d._patchContext.deletedDrawingId = bitsy.drawing.getEngineObject().drw;
