@@ -268,16 +268,17 @@ b3d.lockPointer = function () {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    // patch bitsy with bitsy 3d functions
+    // ensure compatibilty with hacks in exported game by using kitsy when it's included
     if (bitsy.EditMode === undefined) {
-        // if we are in exported game, patch bitsy with 3d functions
-        b3d.patch(bitsy, 'startExportedGame', null, function () {
+        smartPatch('startExportedGame', null, function () {
             b3d.init();
         });
-        b3d.patch(bitsy, 'update', null, function () {
+        smartPatch('update', null, function () {
             b3d.update();
             b3d.render();
         });
-        b3d.patch(bitsy, 'onready', null, function () {        
+        smartPatch('onready', null, function () {        
             // remove borksy touch control fix that breaks mouse camera controls
             var touchTriggerEl = document.getElementById('touchTrigger');
             if (touchTriggerEl) touchTriggerEl.parentElement.removeChild(touchTriggerEl);
@@ -285,16 +286,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     var py;
-    // make position of the dialog box configurable through game settings
-    b3d.patch(dialogRenderer, 'DrawTextbox', function () {
-        py = bitsy.player().y;
-        bitsy.player().y = b3d.settings.positionDialogBoxAtTheTop ? bitsy.mapsize : 0;
-    }, function () {
-        bitsy.player().y = py;
+    smartPatch('dialogRenderer.DrawTextbox',
+        function () {
+            py = bitsy.player().y;
+            bitsy.player().y = b3d.settings.positionDialogBoxAtTheTop ? bitsy.mapsize : 0;
+        }, function () {
+            bitsy.player().y = py;
     });
 
     // adjust movement direction relative to the camera
-    b3d.patch(bitsy, 'movePlayer',
+    smartPatch('movePlayer',
         function () {
             var rotationTable = {};
             rotationTable[bitsy.Direction.Up] = bitsy.Direction.Left;
@@ -321,6 +322,30 @@ document.addEventListener('DOMContentLoaded', function() {
         function () {
             bitsy.curPlayerDirection = b3d.rawDirection;
     });
+
+    function tryAddingToKitsyQueue(key, kind, func) {
+        if (window.kitsy) {
+            var queue;
+            if (kind === 'before') {
+                queue = window.kitsy.queuedBeforeScripts;
+            } else if (kind === 'after') {
+                queue = window.kitsy.queuedAfterScripts;
+            }
+            if (queue) {
+                queue[key] = queue[key] || [];
+                queue[key].push(func);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function smartPatch (key, before, after) {
+        var patchScope = key.split('.').length > 1 ? bitsy[key.split('.')[0]] : bitsy;
+        var patchName = key.split('.').length > 1 ? key.split('.')[1] : key;
+        if (before) tryAddingToKitsyQueue(key, 'before', before) ||  b3d.patch(patchScope, patchName, before, null);
+        if (after) tryAddingToKitsyQueue(key, 'after', after) ||  b3d.patch(patchScope, patchName, null, after);
+    }
 });
 
 // helper function to patch functions
