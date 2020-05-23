@@ -1190,6 +1190,8 @@ b3d.update = function () {
             }
             newMesh = b3d.addMeshInstance(newMesh, s, s.room, s.x, s.y);
             b3d.sprites[id] = oldMesh = newMesh;
+        } else {
+            b3d.updateChildren(s, oldMesh);
         }
     });
     // remove existing tweens when changing the scene
@@ -1253,6 +1255,8 @@ b3d.update = function () {
                 }
                 newMesh = b3d.addMeshInstance(newMesh, item, roomId, roomItem.x, roomItem.y);
                 b3d.items[key] = newMesh;
+            } else {
+                b3d.updateChildren(item, oldMesh);
             }
         });
     });
@@ -1291,7 +1295,7 @@ b3d.update = function () {
                 if (tileId !== '0') {
                     newMesh = b3d.getMesh(tile, bitsy.curPal(), b3d.meshConfig[tile.drw]);
                 }
-                if (oldMesh !== newMesh && (newMesh !== (oldMesh && oldMesh.sourceMesh)))  {
+                if (oldMesh !== newMesh && (newMesh !== (oldMesh && oldMesh.sourceMesh))) {
                     if (oldMesh) {
                         oldMesh.dispose();
                     }
@@ -1299,6 +1303,8 @@ b3d.update = function () {
                         newMesh = b3d.addMeshInstance(newMesh, tile, roomId, x, y);
                     }
                     b3d.tiles[roomId][y][x] = newMesh;
+                }  else if (tile) {
+                    b3d.updateChildren(tile, oldMesh);
                 }
             });
         });
@@ -1394,6 +1400,31 @@ b3d.addChildren = function (drawing, mesh) {
             childMesh.unfreezeWorldMatrix();
         });
     }
+};
+
+b3d.updateChildren = function (parentDrawing, parentMesh) {
+    var childrenConfigs = b3d.meshConfig[parentDrawing.drw].children;
+    if (!childrenConfigs || !parentMesh) return;
+    var childMeshes = parentMesh.getChildren();
+    childrenConfigs.forEach(function (config, i) {
+        var oldMesh = childMeshes[i];
+        var newMesh = null;
+        newMesh = b3d.getMesh(config.drawing, bitsy.curPal(), config);
+        if (oldMesh !== newMesh && (newMesh !== (oldMesh && oldMesh.sourceMesh))) {
+            if (oldMesh) {
+                oldMesh.dispose();
+            }
+            if (newMesh) {
+                newMesh = newMesh.createInstance();
+                newMesh.position.x = parentMesh.position.x;
+                newMesh.position.y = parentMesh.position.y;
+                newMesh.position.z = parentMesh.position.z;
+                newMesh.setParent(parentMesh);
+                b3d.meshExtraSetup(config.drawing, newMesh, config);
+                newMesh.unfreezeWorldMatrix();
+            }
+        }
+    });
 };
 
 b3d.getDefaultTransparency = function (drawing) {

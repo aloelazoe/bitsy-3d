@@ -256,6 +256,7 @@ editor3d.init = function() {
     b3d.patch(bitsy, 'on_play_mode', null, function () {
         b3d.scene.fogEnabled = true;
         b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
+        editor3d.reInit3dData();
         b3d.mainCamera.activate();
         document.getElementById('playModeWarning').style.display = 'block';
         document.getElementById('previewCameraDiv').style.display = 'none';
