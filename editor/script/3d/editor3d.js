@@ -54,6 +54,48 @@ editor3d.cursor = {
     },
 };
 
+editor3d.paintGrid = {
+    mesh: null,
+    gridLines: null,
+    transformNode: null,
+    update: function () {
+        // adjust position and rotation of paint grid according to the position of 3d cursor and rotation of the camera
+        // don't negate camera direction because otherwise plane mesh that we are using for the grid will be facing with its backside
+        var gridDir = b3d.scene.activeCamera.getForwardRay().direction;
+        
+        // snap the direction that the grid should be facing to the closest axis
+        var gridDirArr = gridDir.asArray();
+        var max = 0;
+        var iMax = 0;
+        for (var i = 0; i < gridDirArr.length; i++) {
+            var curAbs = Math.abs(gridDirArr[i]);
+            if (curAbs > max) {
+                iMax = i;
+                max = curAbs;
+            }
+        }
+        for (var i = 0; i < gridDirArr.length; i++) {
+            gridDirArr[i] = i === iMax? Math.sign(gridDirArr[i]): 0;
+        }
+        BABYLON.Vector3.FromArrayToRef(gridDirArr, 0, gridDir);
+
+        // align paint grid in the correct direction
+        this.mesh.lookAt(this.mesh.position.add(gridDir));
+
+        // place the grid acording to the 3d cursor position but constrain it within the cube with bitsy mapsize dimensions
+        var gridPosArr = this.mesh.position.asArray();
+        var cursorPosArr = editor3d.cursor.mesh.position.asArray();
+        for (var i = 0; i < gridPosArr.length; i++) {
+            gridPosArr[i] = i === iMax? cursorPosArr[i] + (Math.sign(gridDirArr[i]) * 0.5): bitsy.mapsize / 2 - 0.5;
+        }
+        BABYLON.Vector3.FromArrayToRef(gridPosArr, 0, this.mesh.position);
+        // ensure that there is no vertical limit
+        if (editor3d.cursor.mesh.position.y > bitsy.mapsize / 2) {
+            this.mesh.position.y = editor3d.cursor.mesh.position.y - 0.5;
+        }
+    },
+};
+
 editor3d.init = function() {
     b3d.init();
     b3d.scene.fogEnabled = false;
@@ -98,6 +140,19 @@ editor3d.init = function() {
     groundMat.alpha = 0;
     editor3d.groundMesh.material = groundMat;
 
+    // initialize paint-grid mesh for mouse-picking
+    editor3d.paintGrid.mesh = BABYLON.MeshBuilder.CreatePlane('paintGrid', {
+        width: bitsy.mapsize,
+        height: bitsy.mapsize,
+    }, b3d.scene);
+    var paintGridMat = new BABYLON.StandardMaterial('paint-grid material', b3d.scene);
+    paintGridMat.maxSimultaneousLights = 0;
+    paintGridMat.ambientColor = editor3d.CursorColors.Gray;
+    paintGridMat.alpha = 0.25;
+    paintGridMat.freeze();
+    editor3d.paintGrid.mesh.material = paintGridMat;
+    editor3d.paintGrid.mesh.isVisible = false;
+
     // set the rendering loop function
     b3d.engine.runRenderLoop(editor3d.update);
 
@@ -133,6 +188,8 @@ editor3d.init = function() {
                 if (editor3d.cursor.isAltDown && editor3d.cursor.mode === editor3d.CursorModes.Select) {
                     editor3d.cursor.mode = editor3d.CursorModes.Remove;
                 }
+                editor3d.paintGrid.mesh.isVisible = true;
+                editor3d.paintGrid.update();
                 break;
         }
     });
@@ -154,6 +211,7 @@ editor3d.init = function() {
                 if (editor3d.cursor.isAltDown && editor3d.cursor.mode === editor3d.CursorModes.Remove) {
                     editor3d.cursor.mode = editor3d.CursorModes.Select;
                 }
+                editor3d.paintGrid.mesh.isVisible = false;
                 break;
         }
     });
