@@ -1292,7 +1292,7 @@ b3d.update = function () {
                 var tile = bitsy.tile[tileId];
                 var oldMesh = b3d.tiles[roomId][y][x];
                 var newMesh = null;
-                if (tileId !== '0') {
+                if (tileId !== '0' && tile) {
                     newMesh = b3d.getMesh(tile, bitsy.curPal(), b3d.meshConfig[tile.drw]);
                 }
                 if (oldMesh !== newMesh && (newMesh !== (oldMesh && oldMesh.sourceMesh))) {

@@ -25,6 +25,8 @@ var editor3d = {
 
     takeScreenshot: false,
 
+    chaosMode: false,
+
     // lists of game settings and camera properties that require special treatment when generating ui elements
     propertyListIgnore: ['clearColor', 'fogColor', 'tweenFunction', 'rotationTweenTime', 'rotationTweenFunction'],
     propertyListRadiansToDegrees: ['alpha', 'beta', 'upperBetaLimit', 'lowerBetaLimit', 'useLeftAndRightToRotateByAngle'],
@@ -61,6 +63,7 @@ editor3d.paintGrid = {
     mesh: null,
     gridLines: null,
     transformNode: null,
+    isOn: false,
     update: function () {
         // adjust position and rotation of paint grid according to the position of 3d cursor and rotation of the camera
         // don't negate camera direction because otherwise plane mesh that we are using for the grid will be facing with its backside
@@ -96,6 +99,17 @@ editor3d.paintGrid = {
         if (editor3d.cursor.mesh.position.y > bitsy.mapsize / 2) {
             this.mesh.position.y = editor3d.cursor.mesh.position.y - 0.5;
         }
+    },
+    turnOn: function () {
+        this.isOn = true;
+        this.mesh.isVisible = true;
+        this.update();
+        editor3d.camera.attachControl = false;
+    },
+    turnOff: function () {
+        this.isOn = false;
+        this.mesh.isVisible = false;
+        editor3d.camera.attachControl = true;
     },
 };
 
@@ -194,8 +208,7 @@ editor3d.init = function() {
                 break;
             case 'Shift':
                 editor3d.cursor.isShiftDown = true;
-                editor3d.paintGrid.mesh.isVisible = true;
-                editor3d.paintGrid.update();
+                if (!bitsy.isPlayMode) editor3d.paintGrid.turnOn();
                 break;
         }
     });
@@ -219,23 +232,38 @@ editor3d.init = function() {
                 break;
             case 'Shift':
                 editor3d.cursor.isShiftDown = false;
-                editor3d.paintGrid.mesh.isVisible = false;
+                editor3d.paintGrid.turnOff();
                 break;
         }
     });
 
     b3d.scene.onPointerDown = function (e) {
         editor3d.cursor.isMouseDown = true;
+        if (editor3d.paintGrid.isOn && editor3d.cursor.isValid) {
+            if (editor3d.cursor.mode === editor3d.CursorModes.Add) {
+                editor3d.placeDrawingAtCursor();
+            } else if (editor3d.cursor.mode === editor3d.CursorModes.Remove) {
+                // todo: make remove mode work properly with the grid
+            }
+        }
     };
 
     b3d.scene.onPointerMove = function (e) {
         // don't update the cursor when moving the camera
-        if (editor3d.cursor.shouldUpdate && editor3d.cursor.isMouseDown) {
+        if (editor3d.cursor.shouldUpdate && editor3d.cursor.isMouseDown && !editor3d.paintGrid.isOn) {
             editor3d.cursor.turnOff();
         }
         // update game camera ui and data when moving the camera in camera preview mode
         if (b3d.scene.activeCamera === b3d.mainCamera.ref && b3d.mainCamera.attachControl && (editor3d.cursor.isMouseDown || b3d.mainCamera.lockPointer && b3d.isPointerLocked)) {
             meshPanel.updateCameraSettingsControllables();
+        }
+        // grid-paint logic
+        if (editor3d.cursor.isMouseDown && editor3d.paintGrid.isOn && (bitsy.drawing.type === bitsy.TileType.Tile || bitsy.drawing.type === bitsy.TileType.Item)) {
+            if (editor3d.cursor.mode === editor3d.CursorModes.Add) {
+                editor3d.placeDrawingAtCursor();
+            } else if (editor3d.cursor.mode === editor3d.CursorModes.Remove) {
+                // todo: remove mode
+            }
         }
     };
 
@@ -515,62 +543,8 @@ editor3d.onPointerUp = function (e) {
 
     // do editor actions logic here
     if (!editor3d.cursor.isValid) return;
-    if (editor3d.cursor.mode === editor3d.CursorModes.Add) {
-        // console.log('going to add new drawing now!');
-        // console.log('curRoomId: ' + editor3d.cursor.curRoomId);
-        // console.log(drawing);
-        // return if there is no currently selected drawing
-        if (!bitsy.drawing) return;
-
-        if (!editor3d.cursor.curRoomId) {
-            // see if the cursor points to an existing room or a new room should be added
-            // if a new room should be added, create it and update the curRoomId on the cursor
-            // also make sure new room is integrated in the current stack data
-
-            // if current room is a stray room without a stack, new stack should be created
-            // and the current room should be added to it
-            if (!b3d.curStack) {
-                b3d.curStack = editor3d.newStackId();
-                editor3d.addRoomToStack(bitsy.curRoom, b3d.curStack, 0);
-            }
-
-            // note: this function sets bitsy.curRoom to newly created room
-            bitsy.newRoom();
-            var newRoomId = bitsy.curRoom;
-            editor3d.addRoomToStack(newRoomId, b3d.curStack, editor3d.cursor.mesh.position.y);
-            editor3d.cursor.curRoomId = newRoomId;
-        }
-
-        if (bitsy.drawing.type === bitsy.TileType.Tile) {
-            // console.log('adding new tile');
-            bitsy.room[editor3d.cursor.curRoomId].tilemap[editor3d.cursor.roomY][editor3d.cursor.roomX] = bitsy.drawing.id;
-        } else if (bitsy.drawing.type === bitsy.TileType.Sprite || bitsy.drawing.type === bitsy.TileType.Avatar) {
-            var s = bitsy.sprite[bitsy.drawing.id];
-            s.room = editor3d.cursor.curRoomId;
-            s.x = editor3d.cursor.roomX;
-            s.y = editor3d.cursor.roomY;
-
-            // if there already is a mesh for this sprite, move it accordingly
-            var mesh = b3d.sprites[bitsy.drawing.id];
-            if (mesh) {
-                mesh.position = editor3d.cursor.mesh.position;
-                // make sure to reapply additional transformation from tags
-                // todo: won't be necessary soon
-                // b3d.applyTransformTags(s, mesh);
-                // update bitsyOrigin object to make sure mouse picking will work correctly
-                mesh.bitsyOrigin.x = s.x;
-                mesh.bitsyOrigin.y = s.y;
-                mesh.bitsyOrigin.roomId = s.room;
-            }
-        } else if (bitsy.drawing.type === bitsy.TileType.Item) {
-            bitsy.room[editor3d.cursor.curRoomId].items.push({
-                id: bitsy.drawing.id,
-                x: editor3d.cursor.roomX,
-                y: editor3d.cursor.roomY,
-            });
-        }
-        bitsy.selectRoom(editor3d.cursor.curRoomId);
-        bitsy.refreshGameData();
+    if (editor3d.cursor.mode === editor3d.CursorModes.Add && !editor3d.paintGrid.isOn) {
+        editor3d.placeDrawingAtCursor();
     // if cursor mode is 'select' or 'remove' picked mesh is not falsy
     } else if (editor3d.cursor.pickedMesh) {
         // ref in global variable for debug
@@ -639,6 +613,57 @@ editor3d.onPointerUp = function (e) {
     bitsy.roomTool.drawEditMap();
     bitsy.updateRoomName();
 }; // editor3d.onPointerUp()
+
+editor3d.placeDrawingAtCursor = function () {
+    // return if there is no currently selected drawing
+    if (!bitsy.drawing) return;
+
+    if (!editor3d.cursor.curRoomId) {
+        // see if the cursor points to an existing room or a new room should be added
+        // if a new room should be added, create it and update the curRoomId on the cursor
+        // also make sure new room is integrated in the current stack data
+
+        // if current room is a stray room without a stack, new stack should be created
+        // and the current room should be added to it
+        if (!b3d.curStack) {
+            b3d.curStack = editor3d.newStackId();
+            editor3d.addRoomToStack(bitsy.curRoom, b3d.curStack, 0);
+        }
+
+        // note: this function sets bitsy.curRoom to newly created room
+        bitsy.newRoom();
+        var newRoomId = bitsy.curRoom;
+        editor3d.addRoomToStack(newRoomId, b3d.curStack, editor3d.cursor.mesh.position.y);
+        editor3d.cursor.curRoomId = newRoomId;
+    }
+
+    if (bitsy.drawing.type === bitsy.TileType.Tile) {
+        bitsy.room[editor3d.cursor.curRoomId].tilemap[editor3d.cursor.roomY][editor3d.cursor.roomX] = bitsy.drawing.id;
+    } else if (bitsy.drawing.type === bitsy.TileType.Sprite || bitsy.drawing.type === bitsy.TileType.Avatar) {
+        var s = bitsy.sprite[bitsy.drawing.id];
+        s.room = editor3d.cursor.curRoomId;
+        s.x = editor3d.cursor.roomX;
+        s.y = editor3d.cursor.roomY;
+
+        // if there already is a mesh for this sprite, move it accordingly
+        var mesh = b3d.sprites[bitsy.drawing.id];
+        if (mesh) {
+            mesh.position = editor3d.cursor.mesh.position;
+            // update bitsyOrigin object to make sure mouse picking will work correctly
+            mesh.bitsyOrigin.x = s.x;
+            mesh.bitsyOrigin.y = s.y;
+            mesh.bitsyOrigin.roomId = s.room;
+        }
+    } else if (bitsy.drawing.type === bitsy.TileType.Item) {
+        bitsy.room[editor3d.cursor.curRoomId].items.push({
+            id: bitsy.drawing.id,
+            x: editor3d.cursor.roomX,
+            y: editor3d.cursor.roomY,
+        });
+    }
+    bitsy.selectRoom(editor3d.cursor.curRoomId);
+    bitsy.refreshGameData();
+};
 
 editor3d.updateCursor = function (pickInfo) {
     // assume that cursor isn't in the valid position unless it is proved to be different
@@ -797,9 +822,14 @@ editor3d.update = function () {
             b3d.scene.pointerX, b3d.scene.pointerY,
             function(m) {
                 if (editor3d.cursor.mode !== editor3d.CursorModes.Add) {
-                    return m.isVisible && m.isPickable && m !== editor3d.groundMesh;
+                    return m.isVisible && m.isPickable && m !== editor3d.groundMesh && m !== editor3d.paintGrid.mesh;
                 } else {
-                    return m.isVisible && m.isPickable;
+                    // when the grid is on, only allow painting on the grid
+                    if (editor3d.paintGrid.isOn && !editor3d.chaosMode) {
+                        return m === editor3d.paintGrid.mesh;
+                    } else {
+                        return m.isVisible && m.isPickable;
+                    }
                 }
             }));
     }
