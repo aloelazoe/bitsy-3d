@@ -41,7 +41,10 @@ editor3d.cursor = {
     pickedMesh: null,
     isMouseDown: false,
     isAltDown: false,
+    isControlDown: false,
     isShiftDown: false,
+    // this will be set to 'Meta' on mac os to use cmd instead of ctrl
+    controlKeyName: 'Control',
     // track if cursor mode was modified by holding down alt for switching to select mode
     modeBeforeModified: null,
     turnOn: function () {
@@ -97,6 +100,15 @@ editor3d.paintGrid = {
 };
 
 editor3d.init = function() {
+    // check if we are on mac os and chould use cmd instead of ctrl and dispaly the correct tip
+    var controlsTipElement = document.getElementById("room3dControlsTip");
+    var controlKeyDisplayName = 'ctrl';
+    if (/mac/i.test(navigator.platform)) {
+        editor3d.cursor.controlKeyName = 'Meta';
+        controlKeyDisplayName = 'cmd';
+    }
+    controlsTipElement.innerHTML = controlsTipElement.innerHTML.replace('[controlKeyDisplayName]', controlKeyDisplayName);
+
     b3d.init();
     b3d.scene.fogEnabled = false;
 
@@ -169,25 +181,19 @@ editor3d.init = function() {
 
     // switch cursor mode when starting to hold alt and shift
     document.addEventListener('keydown', function(e) {
-        switch (e.code) {
-            case 'AltLeft':
-            case 'AltRight':
+        switch (e.key) {
+            case 'Alt':
                 editor3d.cursor.isAltDown = true;
-                if (editor3d.cursor.modeBeforeModified === null) {
-                    editor3d.cursor.modeBeforeModified = editor3d.cursor.mode;
-                    if (editor3d.cursor.isShiftDown) {
-                        editor3d.cursor.mode = editor3d.CursorModes.Remove;
-                    } else {
-                        editor3d.cursor.mode = editor3d.CursorModes.Select;
-                    }
-                }
+                editor3d.cursor.modeBeforeModified = editor3d.cursor.mode;
+                editor3d.cursor.mode = editor3d.CursorModes.Select;
                 break;
-            case 'ShiftLeft':
-            case 'ShiftRight':
+            case editor3d.cursor.controlKeyName:
+                editor3d.cursor.isControlDown = true;
+                editor3d.cursor.modeBeforeModified = editor3d.cursor.mode;
+                editor3d.cursor.mode = editor3d.CursorModes.Remove;
+                break;
+            case 'Shift':
                 editor3d.cursor.isShiftDown = true;
-                if (editor3d.cursor.isAltDown && editor3d.cursor.mode === editor3d.CursorModes.Select) {
-                    editor3d.cursor.mode = editor3d.CursorModes.Remove;
-                }
                 editor3d.paintGrid.mesh.isVisible = true;
                 editor3d.paintGrid.update();
                 break;
@@ -196,21 +202,23 @@ editor3d.init = function() {
 
     // switch cursor mode with number keys and when releasing alt and shift
     document.addEventListener('keyup', function(e) {
-        switch (e.code) {
-            case 'AltLeft':
-            case 'AltRight':
+        switch (e.key) {
+            case 'Alt':
                 editor3d.cursor.isAltDown = false;
-                if (editor3d.cursor.modeBeforeModified !== null) {
-                    editor3d.cursor.mode = editor3d.cursor.modeBeforeModified;
-                    editor3d.cursor.modeBeforeModified = null;
+                if (editor3d.cursor.modeBeforeModified !== editor3d.CursorModes.Select) {
+                    editor3d.cursor.mode = editor3d.cursor.modeBeforeModified || editor3d.CursorModes.Add;
                 }
+                editor3d.cursor.modeBeforeModified = null;
                 break;
-            case 'ShiftLeft':
-            case 'ShiftRight':
-                editor3d.cursor.isShiftDown = false;
-                if (editor3d.cursor.isAltDown && editor3d.cursor.mode === editor3d.CursorModes.Remove) {
-                    editor3d.cursor.mode = editor3d.CursorModes.Select;
+            case editor3d.cursor.controlKeyName:
+                editor3d.cursor.isControlDown = false;
+                if (editor3d.cursor.modeBeforeModified !== editor3d.CursorModes.Remove) {
+                    editor3d.cursor.mode = editor3d.cursor.modeBeforeModified || editor3d.CursorModes.Add;
                 }
+                editor3d.cursor.modeBeforeModified = null;
+                break;
+            case 'Shift':
+                editor3d.cursor.isShiftDown = false;
                 editor3d.paintGrid.mesh.isVisible = false;
                 break;
         }
