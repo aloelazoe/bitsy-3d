@@ -49,6 +49,10 @@ editor3d.cursor = {
     controlKeyName: 'Control',
     // track if cursor mode was modified by holding down alt for switching to select mode
     modeBeforeModified: null,
+    // adjustment between 3d scene and bitsy coordinates to determine which meshes are adjacent to the grid
+    adjustment: null,
+    // vector for storing bitsy position of mesh under the cursor. to be reused for calculating meshes adjacent to the grid
+    curPickBitsyPosition: null,
     turnOn: function () {
         this.shouldUpdate = true;
     },
@@ -91,10 +95,20 @@ editor3d.paintGrid = {
         // place the grid acording to the 3d cursor position but constrain it within the cube with bitsy mapsize dimensions
         var gridPosArr = this.mesh.position.asArray();
         var cursorPosArr = editor3d.cursor.mesh.position.asArray();
+        // save adjustment vector - the difference between visual representation of the grid in 3d scene and its would-be position in bitsy world
+        // later it will help to deterimine if a particular drawing is placed on the grid or not
+        var adjustmentArr = [];
         for (var i = 0; i < gridPosArr.length; i++) {
-            gridPosArr[i] = i === iMax? cursorPosArr[i] + (Math.sign(gridDirArr[i]) * 0.5): bitsy.mapsize / 2 - 0.5;
+            if (i === iMax) {
+                gridPosArr[i] = cursorPosArr[i] + (Math.sign(gridDirArr[i]) * 0.5);
+                adjustmentArr[i] = Math.sign(gridDirArr[i]) * 0.5;
+            } else {
+                gridPosArr[i] = bitsy.mapsize / 2 - 0.5;
+                adjustmentArr[i] = -0.5;
+            }
         }
         BABYLON.Vector3.FromArrayToRef(gridPosArr, 0, this.mesh.position);
+        BABYLON.Vector3.FromArrayToRef(adjustmentArr, 0, this.adjustment);
         // ensure that there is no vertical limit
         if (editor3d.cursor.mesh.position.y > bitsy.mapsize / 2) {
             this.mesh.position.y = editor3d.cursor.mesh.position.y - 0.5;
@@ -110,6 +124,13 @@ editor3d.paintGrid = {
         this.isOn = false;
         this.mesh.isVisible = false;
         editor3d.camera.attachControl = true;
+    },
+    isMeshOnGrid: function (mesh) {
+        var roomConfig = b3d.stackPosOfRoom[mesh.bitsyOrigin.roomId];
+        this.curPickBitsyPosition.copyFromFloats(mesh.bitsyOrigin.x, roomConfig && roomConfig.pos || 0, bitsy.mapsize - 1 - mesh.bitsyOrigin.y);
+        this.curPickBitsyPosition.addInPlace(this.adjustment);
+        var gridBoundingBox = this.mesh.getBoundingInfo().boundingBox;
+        return gridBoundingBox.intersectsPoint(this.curPickBitsyPosition);
     },
 };
 
@@ -178,6 +199,8 @@ editor3d.init = function() {
     paintGridMat.freeze();
     editor3d.paintGrid.mesh.material = paintGridMat;
     editor3d.paintGrid.mesh.isVisible = false;
+    editor3d.paintGrid.adjustment = new BABYLON.Vector3();
+    editor3d.paintGrid.curPickBitsyPosition = new BABYLON.Vector3();
 
     // set the rendering loop function
     b3d.engine.runRenderLoop(editor3d.update);
@@ -242,8 +265,8 @@ editor3d.init = function() {
         if (editor3d.paintGrid.isOn && editor3d.cursor.isValid) {
             if (editor3d.cursor.mode === editor3d.CursorModes.Add) {
                 editor3d.placeDrawingAtCursor();
-            } else if (editor3d.cursor.mode === editor3d.CursorModes.Remove) {
-                // todo: make remove mode work properly with the grid
+            } else if (editor3d.cursor.mode === editor3d.CursorModes.Remove && editor3d.cursor.pickedMesh) {
+                editor3d.removeDrawingAtCursor();
             }
         }
     };
@@ -258,16 +281,33 @@ editor3d.init = function() {
             meshPanel.updateCameraSettingsControllables();
         }
         // grid-paint logic
-        if (editor3d.cursor.isMouseDown && editor3d.paintGrid.isOn && editor3d.cursor.isValid && (bitsy.drawing.type === bitsy.TileType.Tile || bitsy.drawing.type === bitsy.TileType.Item)) {
-            if (editor3d.cursor.mode === editor3d.CursorModes.Add) {
+        if (editor3d.cursor.isMouseDown && editor3d.paintGrid.isOn && editor3d.cursor.isValid) {
+            if (editor3d.cursor.mode === editor3d.CursorModes.Add && (bitsy.drawing.type === bitsy.TileType.Tile || bitsy.drawing.type === bitsy.TileType.Item)) {
                 editor3d.placeDrawingAtCursor();
-            } else if (editor3d.cursor.mode === editor3d.CursorModes.Remove) {
-                // todo: remove mode
+            } else if (editor3d.cursor.mode === editor3d.CursorModes.Remove && editor3d.cursor.pickedMesh) {
+                editor3d.removeDrawingAtCursor();
             }
         }
     };
 
-    b3d.scene.onPointerUp = editor3d.onPointerUp;
+    b3d.scene.onPointerUp = function (e) {
+        editor3d.cursor.isMouseDown = false;
+        // continue updating cursor after moving the camera
+        editor3d.cursor.turnOn();
+
+        if (!editor3d.cursor.isValid) return;
+        if (editor3d.cursor.mode === editor3d.CursorModes.Add && !editor3d.paintGrid.isOn) {
+            editor3d.placeDrawingAtCursor();
+        } else if (editor3d.cursor.pickedMesh) {
+            if (editor3d.cursor.mode === editor3d.CursorModes.Select) {
+                editor3d.selectDrawingAtCursor();
+            } else {
+                editor3d.removeDrawingAtCursor();
+            }
+        }
+        bitsy.roomTool.drawEditMap();
+        bitsy.updateRoomName();
+    };
 
     // update textures when pallete is changed
     bitsy.events.Listen('palette_change', function(event) {
@@ -536,83 +576,23 @@ editor3d.newStackId = function () {
     return makeLetters(id);
 };
 
-editor3d.onPointerUp = function (e) {
-    editor3d.cursor.isMouseDown = false;
-    // continue updating cursor after moving the camera
-    editor3d.cursor.turnOn();
-
-    // do editor actions logic here
-    if (!editor3d.cursor.isValid) return;
-    if (editor3d.cursor.mode === editor3d.CursorModes.Add && !editor3d.paintGrid.isOn) {
-        editor3d.placeDrawingAtCursor();
-    // if cursor mode is 'select' or 'remove' picked mesh is not falsy
-    } else if (editor3d.cursor.pickedMesh) {
-        // ref in global variable for debug
-        editor3d.curSelectedMesh = editor3d.cursor.pickedMesh;
-
-        // as the children tag currently does, assume that children can't be nested
-        try {
-            var bitsyOrigin = editor3d.cursor.pickedMesh.bitsyOrigin || editor3d.cursor.pickedMesh.parent.bitsyOrigin;
-        } catch (err) {
-            console.error("picked mesh doesn't have a bitsyOrigin");
-            console.log(editor3d.cursor.pickedMesh);
-            return;
-        }
-
-        console.log('bitsy origin:');
-        console.log(bitsyOrigin);
-
-        bitsy.selectRoom(bitsyOrigin.roomId);
-
-        // i could infer what drawing it is from the position of the cursor
-        // but there could be cases when a mesh can be pushed outside of its bitsy cell using transform tags
-        // or when there are several rooms in the stack positioned at the same level
-        // would be more robust to attach the data about it's exact bitsy context to the mesh object
-        // when the mesh is created and read it here
-        if (editor3d.cursor.mode === editor3d.CursorModes.Select) {
-            // call the function that bitsy calls when alt-clicking
-            // this function relies on bitsy.curRoom to find the drawing
-            bitsy.editDrawingAtCoordinate(bitsyOrigin.x, bitsyOrigin.y);
-        } else {
-            // remove selected drawing from the room data or move sprite
-            var id = bitsyOrigin.drawing.id;
-            switch (bitsyOrigin.drawing.drw.slice(0, 3)) {
-                case 'SPR':
-                    if (bitsy.playerId === drawing.id) {
-                        return;
-                    }
-                    bitsyOrigin.drawing.room = null;
-                    bitsyOrigin.drawing.x = -1;
-                    bitsyOrigin.drawing.y = -1;
-                    // clean up 3d hack's 'b3d.sprites'
-                    b3d.sprites[id].dispose();
-                    b3d.sprites[id] = null;
-                    delete b3d.sprites[id];
-                    break;
-                case 'ITM':
-                    var roomItems = bitsy.room[bitsyOrigin.roomId].items;
-                    var itemIndex = roomItems.findIndex(function(i) {
-                        return i.id === id &&
-                            i.x === bitsyOrigin.x &&
-                            i.y === bitsyOrigin.y;
-                    });
-                    if (itemIndex !== -1) {
-                        roomItems.splice(itemIndex, 1);
-                    } else {
-                        console.error("can't find an item to remove");
-                        return;
-                    }
-                    break;
-                case 'TIL':
-                    bitsy.room[bitsyOrigin.roomId].tilemap[bitsyOrigin.y][bitsyOrigin.x] = '0';
-                    break;
-            }
-            bitsy.refreshGameData();
-        }
+editor3d.getBitsyOrigin = function (mesh) {
+    // assumes that child meshes can't be nested
+    // i could infer what drawing it is from the position of the cursor
+    // but there could be cases when a mesh can be pushed outside of its bitsy cell using transform tags
+    // or when there are several rooms in the stack positioned at the same level
+    // would be more robust to attach the data about it's exact bitsy context to the mesh object
+    // when the mesh is created and read it here
+    var bitsyOrigin;
+    try {
+        bitsyOrigin = mesh.bitsyOrigin || mesh.parent.bitsyOrigin;
+    } catch (err) {
+        console.error("picked mesh doesn't have a bitsyOrigin");
+        console.log(mesh);
+        return;
     }
-    bitsy.roomTool.drawEditMap();
-    bitsy.updateRoomName();
-}; // editor3d.onPointerUp()
+    return bitsyOrigin;
+};
 
 editor3d.placeDrawingAtCursor = function () {
     // return if there is no currently selected drawing
@@ -662,6 +642,62 @@ editor3d.placeDrawingAtCursor = function () {
         });
     }
     bitsy.selectRoom(editor3d.cursor.curRoomId);
+    bitsy.refreshGameData();
+};
+
+editor3d.selectDrawingAtCursor = function () {
+    // ref in global variable for debug
+    editor3d.curSelectedMesh = editor3d.cursor.pickedMesh;
+
+    var bitsyOrigin = editor3d.getBitsyOrigin(editor3d.cursor.pickedMesh);
+    if (!bitsyOrigin) return;
+
+    console.log('bitsy origin:');
+    console.log(bitsyOrigin);
+
+    bitsy.selectRoom(bitsyOrigin.roomId);
+    // call the function that bitsy calls when alt-clicking
+    // this function relies on bitsy.curRoom to find the drawing
+    bitsy.editDrawingAtCoordinate(bitsyOrigin.x, bitsyOrigin.y);
+};
+
+editor3d.removeDrawingAtCursor = function () {
+    var bitsyOrigin = editor3d.getBitsyOrigin(editor3d.cursor.pickedMesh);
+    if (!bitsyOrigin) return;
+    bitsy.selectRoom(bitsyOrigin.roomId);
+    // remove selected drawing from the room data or move sprite
+    var id = bitsyOrigin.drawing.id;
+    switch (bitsyOrigin.drawing.drw.slice(0, 3)) {
+        case 'SPR':
+            if (bitsy.playerId === drawing.id) {
+                return;
+            }
+            bitsyOrigin.drawing.room = null;
+            bitsyOrigin.drawing.x = -1;
+            bitsyOrigin.drawing.y = -1;
+            // clean up 3d hack's 'b3d.sprites'
+            b3d.sprites[id].dispose();
+            b3d.sprites[id] = null;
+            delete b3d.sprites[id];
+            break;
+        case 'ITM':
+            var roomItems = bitsy.room[bitsyOrigin.roomId].items;
+            var itemIndex = roomItems.findIndex(function(i) {
+                return i.id === id &&
+                    i.x === bitsyOrigin.x &&
+                    i.y === bitsyOrigin.y;
+            });
+            if (itemIndex !== -1) {
+                roomItems.splice(itemIndex, 1);
+            } else {
+                console.error("can't find an item to remove");
+                return;
+            }
+            break;
+        case 'TIL':
+            bitsy.room[bitsyOrigin.roomId].tilemap[bitsyOrigin.y][bitsyOrigin.x] = '0';
+            break;
+    }
     bitsy.refreshGameData();
 };
 
@@ -822,7 +858,11 @@ editor3d.update = function () {
             b3d.scene.pointerX, b3d.scene.pointerY,
             function(m) {
                 if (editor3d.cursor.mode !== editor3d.CursorModes.Add) {
-                    return m.isVisible && m.isPickable && m !== editor3d.groundMesh && m !== editor3d.paintGrid.mesh;
+                    // only allow visible and pickable meshes except for the ground and the grid
+                    // when the grid is on and we are in remove mode, restrict pickable meshes to those on the grid
+                    return m.isVisible && m.isPickable &&
+                           m !== editor3d.groundMesh && m !== editor3d.paintGrid.mesh &&
+                           (!editor3d.paintGrid.isOn || editor3d.cursor.mode !== editor3d.CursorModes.Remove || editor3d.paintGrid.isMeshOnGrid(m));
                 } else {
                     // when the grid is on, only allow painting on the grid
                     if (editor3d.paintGrid.isOn && !editor3d.chaosMode) {
