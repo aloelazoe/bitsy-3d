@@ -258,7 +258,7 @@ editor3d.init = function() {
             meshPanel.updateCameraSettingsControllables();
         }
         // grid-paint logic
-        if (editor3d.cursor.isMouseDown && editor3d.paintGrid.isOn && (bitsy.drawing.type === bitsy.TileType.Tile || bitsy.drawing.type === bitsy.TileType.Item)) {
+        if (editor3d.cursor.isMouseDown && editor3d.paintGrid.isOn && editor3d.cursor.isValid && (bitsy.drawing.type === bitsy.TileType.Tile || bitsy.drawing.type === bitsy.TileType.Item)) {
             if (editor3d.cursor.mode === editor3d.CursorModes.Add) {
                 editor3d.placeDrawingAtCursor();
             } else if (editor3d.cursor.mode === editor3d.CursorModes.Remove) {
