@@ -72,7 +72,7 @@ editor3d.paintGrid = {
         // adjust position and rotation of paint grid according to the position of 3d cursor and rotation of the camera
         // don't negate camera direction because otherwise plane mesh that we are using for the grid will be facing with its backside
         var gridDir = b3d.scene.activeCamera.getForwardRay().direction;
-        
+
         // snap the direction that the grid should be facing to the closest axis
         var gridDirArr = gridDir.asArray();
         var max = 0;
@@ -419,12 +419,12 @@ editor3d.init = function() {
     // which doesn't work as a patch for some reason, so i had to modify bitsy source
     // also needed to make thumbnails draggable in 'explorer.js'
     // and fix a few other new bugs in 'paint.js' and 'editor.js'
-    
+
     // replace 'find drawing' tab buttons callbacks so that they don't
     // automatically select a new drawing
     // this way 'find drawing' panel can be more useful for drag & drop
     document.getElementById('paintExplorerOptionAvatar').onclick = function() {
-        if(bitsy.paintExplorer != null) { 
+        if(bitsy.paintExplorer != null) {
             bitsy.paintExplorer.Refresh(bitsy.TileType.Avatar);
         }
         document.getElementById("paintExplorerOptionAvatar").checked = true;
@@ -452,7 +452,7 @@ editor3d.init = function() {
         document.getElementById("paintExplorerAdd").setAttribute("style","display:inline-block;");
         document.getElementById("paintExplorerFilterInput").value = "";
     };
-    
+
 }; // editor3d.init()
 
 // clear caches to force textures and meshes to update
@@ -493,7 +493,7 @@ editor3d.reInit3dData = function () {
 };
 
 editor3d.suggestReplacingNameTags = function () {
-    // check if name tags are used and ask to delete them: new data format made them redundant 
+    // check if name tags are used and ask to delete them: new data format made them redundant
     var nameTagsRegex = / ?#(stack|mesh|draw|r|t|s|transparent|children)\([^]*?\)/gm;
     var usesNameTags;
     Object.values(bitsy.names).forEach(function (namesMap) {
@@ -563,7 +563,7 @@ editor3d.newStackId = function () {
                 if (i > 0) {
                     arr[i] = min;
                     continue;
-                } else {            
+                } else {
                     var newLength = arr.length + 1;
                     for (var n = 0; n < newLength; n++) {
                         arr[n] = min;
@@ -912,7 +912,7 @@ var room3dPanel = {
         // and make a list of all rooms we can switch between
         var eligibleRooms = Object.values(b3d.roomsInStack)
             .map(function(roomList) {
-                return roomList[0]; 
+                return roomList[0];
             })
             .concat(Object.keys(bitsy.room).filter(function(roomId){
                 return !b3d.stackPosOfRoom[roomId];
@@ -1043,7 +1043,7 @@ var meshPanel = {
                     templateName = p;
                 }
             });
-            
+
             if (Array.prototype.some.call(meshPanel.typeSelectEl.options, function(o) {return o.text === templateName;})) {
                 return;
             }
@@ -1178,7 +1178,7 @@ var meshPanel = {
         // add new child element. it will be checked by default
         // and selected as current drawing for editing mesh configuration
         var childrenList = document.getElementById('meshChildrenList');
-        
+
         var divEl = document.createElement('div');
         var inputEl = document.createElement('input');
         var labelEl = document.createElement('label');
@@ -1189,10 +1189,10 @@ var meshPanel = {
         divEl.appendChild(labelEl);
         labelEl.appendChild(spanEl);
 
-        var inputId = 'childMesh' + childIndex;        
+        var inputId = 'childMesh' + childIndex;
         labelEl.htmlFor = inputId;
         spanEl.innerHTML = meshPanel.getDrawingFullTitle(drawing);
-        
+
         // set up radio button element and mark it as checked
         Object.assign(inputEl, {type: 'radio', name: 'children list', value: childIndex, id: inputId, onclick: meshPanel.selectChild, checked: true});
         // select drawing as current
@@ -1254,7 +1254,7 @@ var meshPanel = {
         var childIndex = Number(this.value);
         var childDrw = b3d.meshConfig[baseDrw].children[childIndex];
         b3d.meshConfig[baseDrw].children.splice(childIndex, 1);
-        
+
         // update 3d scene
         b3d.clearCachesMesh(childDrw); // todo: maybe this is redundant now that child configs are separated
         b3d.clearCachesMesh(baseDrw);
@@ -1387,7 +1387,7 @@ var meshPanel = {
         var defaultVal = event.target.id.indexOf('Scale') !== -1? 1: 0;
         // only allows 5 digits after decimal point: this will be serialized consistently
         meshPanel.transformValidatedNumbers[index] = meshPanel.validateInputElementAsNumber(event.target, defaultVal, 5);
-        
+
         meshPanel.getCurMeshConfig().transform = b3d.transformFromArray(meshPanel.transformValidatedNumbers);
 
         // force mesh instances to be recreated with the new transform by clearing the cache
@@ -1543,7 +1543,7 @@ var meshPanel = {
             var option = document.createElement('option');
             option.text = option.value = presetName;
             document.getElementById('settings3dCameraPreset').add(option);
-            // todo: select the correct camera preset option 
+            // todo: select the correct camera preset option
             if (b3d.curCameraPreset === presetName) {
                 option.selected = true;
             }
@@ -1605,7 +1605,7 @@ var meshPanel = {
 
             meshPanel.cameraSettingsControllers.push(controller);
         });
-        
+
         // make sure preview game camera buttons are reset
         meshPanel.updatePreviewCameraButtons(false);
     },
@@ -1620,14 +1620,14 @@ var meshPanel = {
         this.defaultPropertyValue = defaultPropertyValue;
         this.elementParent = elementParent;
         this.onInput = onInput;
-        
+
         this.validate = function () {return this.elementInput.value;};
         this.convertToData = function (a) {return a;};
         this.convertFromData = function (a) {return a;};
 
         this.elementDiv = document.createElement('div');
         this.elementParent.appendChild(this.elementDiv);
-        
+
         this.elementLabel = document.createElement('label');
         this.elementDiv.appendChild(this.elementLabel);
         this.elementLabel.innerText = this.boundPropertyName.replace(/([A-Z])/g, " $1" ).toLowerCase() + ': ';
