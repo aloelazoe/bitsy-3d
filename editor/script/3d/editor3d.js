@@ -65,7 +65,7 @@ editor3d.cursor = {
 
 editor3d.paintGrid = {
     mesh: null,
-    gridLines: null,
+    lines: null,
     transformNode: null,
     isOn: false,
     update: function () {
@@ -90,10 +90,10 @@ editor3d.paintGrid = {
         BABYLON.Vector3.FromArrayToRef(gridDirArr, 0, gridDir);
 
         // align paint grid in the correct direction
-        this.mesh.lookAt(this.mesh.position.add(gridDir));
+        this.transformNode.lookAt(this.transformNode.position.add(gridDir));
 
         // place the grid acording to the 3d cursor position but constrain it within the cube with bitsy mapsize dimensions
-        var gridPosArr = this.mesh.position.asArray();
+        var gridPosArr = this.transformNode.position.asArray();
         var cursorPosArr = editor3d.cursor.mesh.position.asArray();
         // save adjustment vector - the difference between visual representation of the grid in 3d scene and its would-be position in bitsy world
         // later it will help to deterimine if a particular drawing is placed on the grid or not
@@ -107,22 +107,24 @@ editor3d.paintGrid = {
                 adjustmentArr[i] = -0.5;
             }
         }
-        BABYLON.Vector3.FromArrayToRef(gridPosArr, 0, this.mesh.position);
+        BABYLON.Vector3.FromArrayToRef(gridPosArr, 0, this.transformNode.position);
         BABYLON.Vector3.FromArrayToRef(adjustmentArr, 0, this.adjustment);
         // ensure that there is no vertical limit
         if (editor3d.cursor.mesh.position.y > bitsy.mapsize / 2) {
-            this.mesh.position.y = editor3d.cursor.mesh.position.y - 0.5;
+            this.transformNode.position.y = editor3d.cursor.mesh.position.y - 0.5;
         }
     },
     turnOn: function () {
         this.isOn = true;
         this.mesh.isVisible = true;
+        this.lines.isVisible = true;
         this.update();
         editor3d.camera.attachControl = false;
     },
     turnOff: function () {
         this.isOn = false;
         this.mesh.isVisible = false;
+        this.lines.isVisible = false;
         editor3d.camera.attachControl = true;
     },
     isMeshOnGrid: function (mesh) {
@@ -187,8 +189,10 @@ editor3d.init = function() {
     groundMat.alpha = 0;
     editor3d.groundMesh.material = groundMat;
 
+    // create a parent node for pickable mesh and the lines of the grid
+    editor3d.paintGrid.transformNode = new BABYLON.TransformNode('gridTransform', b3d.scene);
     // initialize paint-grid mesh for mouse-picking
-    editor3d.paintGrid.mesh = BABYLON.MeshBuilder.CreatePlane('paintGrid', {
+    editor3d.paintGrid.mesh = BABYLON.MeshBuilder.CreatePlane('gridMesh', {
         width: bitsy.mapsize,
         height: bitsy.mapsize,
     }, b3d.scene);
@@ -201,6 +205,23 @@ editor3d.init = function() {
     editor3d.paintGrid.mesh.isVisible = false;
     editor3d.paintGrid.adjustment = new BABYLON.Vector3();
     editor3d.paintGrid.curPickBitsyPosition = new BABYLON.Vector3();
+    editor3d.paintGrid.mesh.setParent(editor3d.paintGrid.transformNode);
+    // build a grid out of lines
+    var lines = [];
+    for (var i = 0; i <= bitsy.mapsize; i++) {
+        lines[i] = [
+            new BABYLON.Vector3(-bitsy.mapsize/2 + i, -bitsy.mapsize/2, 0),
+            new BABYLON.Vector3(-bitsy.mapsize/2 + i, bitsy.mapsize/2, 0),
+        ];
+        lines[i+bitsy.mapsize+1] = [
+            new BABYLON.Vector3(-bitsy.mapsize/2, -bitsy.mapsize/2 + i, 0),
+            new BABYLON.Vector3(bitsy.mapsize/2, -bitsy.mapsize/2 + i, 0),
+        ];
+    }
+    editor3d.paintGrid.lines = BABYLON.MeshBuilder.CreateLineSystem("gridLines", {lines: lines}, b3d.scene);
+    editor3d.paintGrid.lines.isPickable = false;
+    editor3d.paintGrid.lines.isVisible = false;
+    editor3d.paintGrid.lines.setParent(editor3d.paintGrid.transformNode);
 
     // set the rendering loop function
     b3d.engine.runRenderLoop(editor3d.update);
