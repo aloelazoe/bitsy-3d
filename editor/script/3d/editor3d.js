@@ -68,6 +68,8 @@ editor3d.paintGrid = {
     lines: null,
     transformNode: null,
     isOn: false,
+    // offset to minimize z-fighting between the grid and other meshes in the scene
+    offset: 0.05,
     update: function () {
         // adjust position and rotation of paint grid according to the position of 3d cursor and rotation of the camera
         // don't negate camera direction because otherwise plane mesh that we are using for the grid will be facing with its backside
@@ -101,7 +103,7 @@ editor3d.paintGrid = {
         for (var i = 0; i < gridPosArr.length; i++) {
             if (i === iMax) {
                 gridPosArr[i] = cursorPosArr[i] + (Math.sign(gridDirArr[i]) * 0.5);
-                adjustmentArr[i] = Math.sign(gridDirArr[i]) * 0.5;
+                adjustmentArr[i] = (Math.sign(gridDirArr[i]) * 0.5) + (Math.sign(gridDirArr[i]) * -editor3d.paintGrid.offset);
             } else {
                 gridPosArr[i] = bitsy.mapsize / 2 - 0.5;
                 adjustmentArr[i] = -0.5;
@@ -196,6 +198,7 @@ editor3d.init = function() {
         width: bitsy.mapsize,
         height: bitsy.mapsize,
     }, b3d.scene);
+    b3d.transformGeometry(editor3d.paintGrid.mesh, BABYLON.Matrix.Translation(0, 0, -editor3d.paintGrid.offset));
     var paintGridMat = new BABYLON.StandardMaterial('paint-grid material', b3d.scene);
     paintGridMat.maxSimultaneousLights = 0;
     paintGridMat.ambientColor = editor3d.CursorColors.Gray;
@@ -219,6 +222,7 @@ editor3d.init = function() {
         ];
     }
     editor3d.paintGrid.lines = BABYLON.MeshBuilder.CreateLineSystem("gridLines", {lines: lines}, b3d.scene);
+    b3d.transformGeometry(editor3d.paintGrid.lines, BABYLON.Matrix.Translation(0, 0, -editor3d.paintGrid.offset));
     editor3d.paintGrid.lines.isPickable = false;
     editor3d.paintGrid.lines.isVisible = false;
     editor3d.paintGrid.lines.setParent(editor3d.paintGrid.transformNode);
