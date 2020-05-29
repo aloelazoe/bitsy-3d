@@ -221,12 +221,12 @@ editor3d.init = function() {
         switch (e.key) {
             case 'Alt':
                 editor3d.cursor.isAltDown = true;
-                editor3d.cursor.modeBeforeModified = editor3d.cursor.mode;
+                if (editor3d.cursor.mode !== editor3d.CursorModes.Select) editor3d.cursor.modeBeforeModified = editor3d.cursor.mode;
                 editor3d.cursor.mode = editor3d.CursorModes.Select;
                 break;
             case editor3d.cursor.controlKeyName:
                 editor3d.cursor.isControlDown = true;
-                editor3d.cursor.modeBeforeModified = editor3d.cursor.mode;
+                if (editor3d.cursor.mode !== editor3d.CursorModes.Remove) editor3d.cursor.modeBeforeModified = editor3d.cursor.mode;
                 editor3d.cursor.mode = editor3d.CursorModes.Remove;
                 break;
             case 'Shift':
@@ -258,6 +258,12 @@ editor3d.init = function() {
                 editor3d.paintGrid.turnOff();
                 break;
         }
+    });
+
+    window.addEventListener('blur', function(e) {
+        // make sure the cursor mode and the grid don't get stuck in their current state when the window loses focus
+        editor3d.cursor.mode = editor3d.CursorModes.Add;
+        editor3d.paintGrid.turnOff();
     });
 
     b3d.scene.onPointerDown = function (e) {
