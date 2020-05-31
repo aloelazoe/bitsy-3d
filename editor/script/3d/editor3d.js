@@ -749,6 +749,8 @@ editor3d.updateCursor = function (pickInfo) {
     // console.log('id: ' + mesh.id + ', source mesh: ' + meshName + ', faceId: ' + faceId);
     // console.log(mesh);
 
+    var bitsyOrigin = editor3d.getBitsyOrigin(mesh);
+
     if (editor3d.cursor.mode === editor3d.CursorModes.Add) {
         // console.log('cursor mode: add');
         editor3d.cursor.mesh.material.ambientColor = editor3d.CursorColors.Green;
@@ -810,7 +812,12 @@ editor3d.updateCursor = function (pickInfo) {
             editor3d.cursor.mesh.material.ambientColor = editor3d.CursorColors.Gray;
         }
 
-        editor3d.cursor.mesh.position = mesh.absolutePosition;
+        if (!bitsyOrigin) {
+            return
+        } else {
+            var roomConfig = b3d.stackPosOfRoom[bitsyOrigin.roomId];
+            editor3d.cursor.mesh.position.copyFromFloats(bitsyOrigin.x, roomConfig && roomConfig.pos || 0, bitsy.mapsize - 1 - bitsyOrigin.y);
+        }
 
         editor3d.cursor.pickedMesh = mesh;
 
