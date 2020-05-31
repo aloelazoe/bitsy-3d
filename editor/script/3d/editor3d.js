@@ -130,8 +130,10 @@ editor3d.paintGrid = {
         editor3d.camera.attachControl = true;
     },
     isMeshOnGrid: function (mesh) {
-        var roomConfig = b3d.stackPosOfRoom[mesh.bitsyOrigin.roomId];
-        this.curPickBitsyPosition.copyFromFloats(mesh.bitsyOrigin.x, roomConfig && roomConfig.pos || 0, bitsy.mapsize - 1 - mesh.bitsyOrigin.y);
+        var bitsyOrigin = editor3d.getBitsyOrigin(mesh);
+        if (!bitsyOrigin) return false;
+        var roomConfig = b3d.stackPosOfRoom[bitsyOrigin.roomId];
+        this.curPickBitsyPosition.copyFromFloats(bitsyOrigin.x, roomConfig && roomConfig.pos || 0, bitsy.mapsize - 1 - bitsyOrigin.y);
         this.curPickBitsyPosition.addInPlace(this.adjustment);
         var gridBoundingBox = this.mesh.getBoundingInfo().boundingBox;
         return gridBoundingBox.intersectsPoint(this.curPickBitsyPosition);
