@@ -616,15 +616,7 @@ editor3d.getBitsyOrigin = function (mesh) {
     // or when there are several rooms in the stack positioned at the same level
     // would be more robust to attach the data about it's exact bitsy context to the mesh object
     // when the mesh is created and read it here
-    var bitsyOrigin;
-    try {
-        bitsyOrigin = mesh.bitsyOrigin || mesh.parent.bitsyOrigin;
-    } catch (err) {
-        console.error("picked mesh doesn't have a bitsyOrigin");
-        console.log(mesh);
-        return;
-    }
-    return bitsyOrigin;
+    return bitsyOrigin = mesh.bitsyOrigin || (mesh.parent && mesh.parent.bitsyOrigin);
 };
 
 editor3d.placeDrawingAtCursor = function () {
@@ -749,8 +741,6 @@ editor3d.updateCursor = function (pickInfo) {
     // console.log('id: ' + mesh.id + ', source mesh: ' + meshName + ', faceId: ' + faceId);
     // console.log(mesh);
 
-    var bitsyOrigin = editor3d.getBitsyOrigin(mesh);
-
     if (editor3d.cursor.mode === editor3d.CursorModes.Add) {
         // console.log('cursor mode: add');
         editor3d.cursor.mesh.material.ambientColor = editor3d.CursorColors.Green;
@@ -812,6 +802,7 @@ editor3d.updateCursor = function (pickInfo) {
             editor3d.cursor.mesh.material.ambientColor = editor3d.CursorColors.Gray;
         }
 
+        var bitsyOrigin = editor3d.getBitsyOrigin(mesh);
         if (!bitsyOrigin) {
             return
         } else {
