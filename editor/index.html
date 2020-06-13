@@ -398,7 +398,7 @@
 							</label>
 						</form>
 
-						<form id="meshChildrenList" style="display:none; margin-top:5px; margin-bottom:5px;">
+						<form id="meshChildrenList" style="display:none; margin-top:5px; margin-bottom:5px;" ondrop="meshPanel.addChildDropHandler(event)" ondragover="meshPanel.addChildDragoverHandler(event)">
 							<!-- <div>
 								<input type="radio" name="children list" value="childMeshExample" onclick="meshPanel.selectChild(event);" id="childMeshExample" checked>
 								<label for="childMeshExample">
