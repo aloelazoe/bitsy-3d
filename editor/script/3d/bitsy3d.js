@@ -80,7 +80,7 @@ b3d.cameraPresets = {
     'orbiting follower': {
         type: 'arc',
         fov: 0.9,
-        inertia: 0.8,
+        inertia: 0.7,
         target: {x: 8, z: 8, y: 3},
         alpha: -Math.PI/2,
         beta: Math.PI/3,
@@ -95,7 +95,7 @@ b3d.cameraPresets = {
     'fixed target orbiter': {
         type: 'arc',
         fov: 0.9,
-        inertia: 0.8,
+        inertia: 0.7,
         target: {x: 8, z: 8, y: 1.5},
         alpha: -Math.PI/2,
         beta: Math.PI/3,
