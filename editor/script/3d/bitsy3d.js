@@ -990,6 +990,9 @@ b3d.initMeshTemplates = function () {
 
     meshTemplates.wedge = wedgeMesh;
 
+    // add empty mesh
+    meshTemplates.empty = new BABYLON.Mesh('empty', b3d.scene);
+
     return meshTemplates;
 }; // b3d.initMeshTemplates()
 
@@ -1080,8 +1083,13 @@ b3d.getMaterial = function (drawing, pal, transparency) {
     return b3d.getMaterialFromCache(key, [drawing, pal, transparency]);
 };
 
-b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, config) {
-    var mesh = b3d.meshTemplates[config.type].clone();
+b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, config, hidden) {
+    var mesh;
+    if (hidden) {
+        mesh = b3d.meshTemplates.empty.clone();
+    } else {
+        mesh = b3d.meshTemplates[config.type].clone();
+    }
     mesh.makeGeometryUnique();
     mesh.isVisible = false;
     mesh.material = b3d.getMaterial(drawing, pal, config.transparency);
@@ -1093,13 +1101,18 @@ b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, config) {
 });
 
 b3d.getMesh = function (drawing, pal, config) {
+    var hidden = b3d.isObjectHidden(config);
+    // if this object doesn't have children and should be hidden, it will be null and won't be added at all
+    if (hidden && !config.children && drawing !== bitsy.player()) {
+        return null;
+    }
     var drw = drawing.drw;
     var col = drawing.col;
     var frame = drawing.animation.frameIndex;
     // include type in the key to account for cases when drawings that link to
     // the same 'drw' need to have different types when using with other hacks
-    var key = `${drw},${frame},${col},${pal},${config.type},${config.transparency}`;
-    return b3d.getMeshFromCache(key, [drawing, pal, config]);
+    var key = `${drw},${frame},${col},${pal},${config.type},${config.transparency},${hidden}`;
+    return b3d.getMeshFromCache(key, [drawing, pal, config, hidden]);
 };
 
 b3d.clearCaches = function (cachesArr, drw, frame, col, pal) {
@@ -1181,18 +1194,7 @@ b3d.update = function () {
         // go through bitsy sprites and get those that should be currently displayed
         return b3d.isRoomVisible(s.room);
     }).forEach(function (s) {
-        var id = s.id;
-        var oldMesh = b3d.sprites[id];
-        var newMesh = b3d.getMesh(s, bitsy.curPal(), b3d.meshConfig[s.drw]);
-        if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
-            if (oldMesh) {
-                oldMesh.dispose();
-            }
-            newMesh = b3d.addMeshInstance(newMesh, s, s.room, s.x, s.y);
-            b3d.sprites[id] = oldMesh = newMesh;
-        } else {
-            b3d.updateChildren(s, oldMesh);
-        }
+        b3d.sprites[s.id] = b3d.updateObject(b3d.sprites[s.id], s, s.room, s.x, s.y);
     });
     // remove existing tweens when changing the scene
     if (didChangeScene || editorMode) {
@@ -1246,18 +1248,7 @@ b3d.update = function () {
     (b3d.roomsInStack[b3d.curStack] || [bitsy.curRoom]).forEach(function (roomId) {
         bitsy.room[roomId].items.forEach(function (roomItem) {
             var key = `${roomId},${roomItem.id},${roomItem.x},${roomItem.y}`;
-            var item = bitsy.item[roomItem.id];
-            var oldMesh = b3d.items[key];
-            var newMesh = b3d.getMesh(item, bitsy.curPal(), b3d.meshConfig[item.drw]);
-            if (newMesh !== (oldMesh && oldMesh.sourceMesh)) {
-                if (oldMesh) {
-                    oldMesh.dispose();
-                }
-                newMesh = b3d.addMeshInstance(newMesh, item, roomId, roomItem.x, roomItem.y);
-                b3d.items[key] = newMesh;
-            } else {
-                b3d.updateChildren(item, oldMesh);
-            }
+            b3d.items[key] = b3d.updateObject(b3d.items[key], bitsy.item[roomItem.id], roomId, roomItem.x, roomItem.y);
         });
     });
 
@@ -1289,23 +1280,7 @@ b3d.update = function () {
         }
         bitsy.room[roomId].tilemap.forEach(function(row, y) {
             row.forEach(function(tileId, x) {
-                var tile = bitsy.tile[tileId];
-                var oldMesh = b3d.tiles[roomId][y][x];
-                var newMesh = null;
-                if (tileId !== '0' && tile) {
-                    newMesh = b3d.getMesh(tile, bitsy.curPal(), b3d.meshConfig[tile.drw]);
-                }
-                if (oldMesh !== newMesh && (newMesh !== (oldMesh && oldMesh.sourceMesh))) {
-                    if (oldMesh) {
-                        oldMesh.dispose();
-                    }
-                    if (newMesh) {
-                        newMesh = b3d.addMeshInstance(newMesh, tile, roomId, x, y);
-                    }
-                    b3d.tiles[roomId][y][x] = newMesh;
-                }  else if (tile) {
-                    b3d.updateChildren(tile, oldMesh);
-                }
+                b3d.tiles[roomId][y][x] = b3d.updateObject(b3d.tiles[roomId][y][x], bitsy.tile[tileId], roomId, x, y);
             });
         });
     });
@@ -1340,18 +1315,43 @@ b3d.render = function () {
     b3d.scene.activeCamera.fov = fov;
 };
 
+b3d.updateObject = function (oldObject, drawing, roomId, x, y) {
+    // consider that drawing can be undefined and oldObject could be undefined
+    var newObject = null;
+    if (drawing) {
+        // if this object doesn't have children and should be hidden, it will be null and won't be added at all
+        newObject = b3d.getMesh(drawing, bitsy.curPal(), b3d.meshConfig[drawing.drw]);
+    }
+    if (oldObject !== newObject && (newObject !== (oldObject && oldObject.sourceMesh))) {
+        if (oldObject) {
+            oldObject.dispose();
+            oldObject = null;
+        }
+        if (newObject) {
+            newObject = b3d.addMeshInstance(newObject, drawing, roomId, x, y);
+            return newObject;
+        } else {
+            return oldObject;
+        }
+    } else if (drawing && oldObject) {
+        b3d.updateChildren(drawing, oldObject);
+        return oldObject;
+    } else {
+        return null;
+    }
+};
+
+b3d.isObjectHidden = function (config) {
+    return config.hidden && (bitsy.EditMode === undefined || b3d.scene.activeCamera === b3d.mainCamera.ref);
+};
+
 b3d.isRoomVisible = function (roomId) {
     // true if the room is the current room or we are in the stack and the room is not a stray room and is in the current stack
     return roomId === bitsy.curRoom || b3d.curStack && b3d.stackPosOfRoom[roomId] && b3d.stackPosOfRoom[roomId].stack === b3d.curStack;
 };
 
 b3d.addMeshInstance = function (mesh, drawing, roomId, x, y) {
-    var instance;
-    if (b3d.meshConfig[drawing.drw].hidden && (bitsy.EditMode === undefined || b3d.scene.activeCamera === b3d.mainCamera.ref)) {
-        instance = new BABYLON.TransformNode();
-    } else {
-        instance = mesh.createInstance();
-    }
+    var instance = mesh.createInstance();
     instance.position.x = x;
     instance.position.z = bitsy.mapsize - 1 - y;
     instance.position.y = b3d.stackPosOfRoom[roomId] && b3d.stackPosOfRoom[roomId].pos || 0;
@@ -1386,10 +1386,10 @@ b3d.addChildren = function (drawing, mesh) {
         b3d.meshConfig[drawing.drw].children.forEach(function(childConfig) {
             var childDrawing = childConfig.drawing;
             var childMesh = b3d.getMesh(childDrawing, bitsy.curPal(), childConfig);
-            if (childConfig.hidden && (bitsy.EditMode === undefined || b3d.scene.activeCamera === b3d.mainCamera.ref)) {
-                childMesh = new BABYLON.TransformNode();
-            } else {
+            if (childMesh){
                 childMesh = childMesh.createInstance();
+            }  else {
+                return;
             }
             childMesh.position.x = mesh.position.x;
             childMesh.position.y = mesh.position.y;
