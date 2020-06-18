@@ -1102,8 +1102,8 @@ b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, config, hidd
 
 b3d.getMesh = function (drawing, pal, config) {
     var hidden = b3d.isObjectHidden(config);
-    // if this object doesn't have children and should be hidden, it will be null and won't be added at all
-    if (hidden && !config.children && drawing !== bitsy.player()) {
+    // if this object doesn't have children and should be hidden and isn't a sprite, it will be null and won't be added at all
+    if (hidden && !config.children && drawing.room === undefined) {
         return null;
     }
     var drw = drawing.drw;
@@ -1237,9 +1237,9 @@ b3d.update = function () {
                 return;
             }
         }
-        // if this item is not in the current stack
-        // or in the current stack but was picked up or stolen by demons
-        entry[1].dispose();
+        if (entry[1]) {
+            entry[1].dispose();
+        }
         entry[1] = null;
         delete b3d.items[entry[0]];
     });
