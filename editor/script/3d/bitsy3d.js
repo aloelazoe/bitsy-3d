@@ -412,6 +412,9 @@ b3d.init = function () {
     b3d.scene.ambientColor = new BABYLON.Color3(1, 1, 1);
     b3d.scene.freezeActiveMeshes();
 
+    // optimization: this gives noticeable boost in very large scenes
+    b3d.scene.blockMaterialDirtyMechanism = true;
+
     // set up text canvas
     b3d.textCanvas.width = bitsy.canvas.width;
     b3d.textCanvas.height = bitsy.canvas.height;
