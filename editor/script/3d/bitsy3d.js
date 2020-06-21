@@ -10,8 +10,8 @@ var b3d = {
 
         enableFog: false,
         fogColor: 0,
-        fogStart: 0,
-        fogEnd: 0,
+        fogStart: 5,
+        fogEnd: 20,
 
         // todo: dialog position
         positionDialogBoxAtTheTop: false,
