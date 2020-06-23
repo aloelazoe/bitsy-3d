@@ -633,7 +633,7 @@ b3d.createCamera = function (camData) {
                     configurable: true,
                     enumerable: true,
                     get: function () { return camera.ref[k][vectorKey]; },
-                    set: function (a) { camera.ref[vectorKey] = a; },
+                    set: function (a) { camera.ref[k][vectorKey] = a; },
                 });
             }
         });
