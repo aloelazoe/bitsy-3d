@@ -410,6 +410,10 @@ editor3d.init = function() {
         },
         function () {
             delete b3d.meshConfig[b3d._patchContext.deletedDrawingId];
+            b3d.clearCachesTexture(b3d._patchContext.deletedDrawingId);
+            Object.keys(b3d.animatedMaterials).forEach(function (key) {
+                if (key.indexOf(b3d._patchContext.deletedDrawingId) !== -1) delete b3d.animatedMaterials[key];
+            });
             delete b3d._patchContext.deletedDrawingId;
         }
     );
@@ -439,6 +443,19 @@ editor3d.init = function() {
         document.getElementById('previewCameraDiv').style.display = 'block';
         document.getElementById('previewCameraLabelScene3d').style.display = 'inline';
     });
+
+    // make sure animation is reset to its first frame when it is switched off
+    b3d.patch(bitsy, 'on_toggle_animated', function () {
+        var curDrw = bitsy.paintTool.getCurObject().drw;
+        b3d.clearCachesTexture(curDrw);
+        if (!document.getElementById("animatedCheckbox").checked) {
+            Object.keys(b3d.animatedMaterials).forEach(function (key) {
+                if (key.indexOf(curDrw) !== -1) {
+                    delete b3d.animatedMaterials[key];
+                }
+            });
+        }
+    }, null);
 
     // change the behavior of 'find drawing' panel to allow viewing drawings
     // of different types without automatically selecting a drawing of that type
@@ -484,7 +501,7 @@ editor3d.init = function() {
 
 // clear caches to force textures and meshes to update
 editor3d.updateTextureOneTimeListener = function(e) {
-    b3d.clearCachesTexture(bitsy.paintTool.getCurObject().drw, bitsy.paintTool.curDrawingFrameIndex);
+    b3d.clearCachesTexture(bitsy.paintTool.getCurObject().drw);
     // also clear mesh and materials caches to make sure meshes that use updated drawing as a replacement
     // will get updated too, instead of continuing to point to a deleted texture
     b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);

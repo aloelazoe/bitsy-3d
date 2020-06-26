@@ -47,6 +47,8 @@ var b3d = {
     tiles: {},
 
     caches: {},
+    animatedMaterials: {},
+    didUpdateAnimations: false,
 
     avatarRef: null,
     avatarNode: null,
@@ -294,6 +296,22 @@ document.addEventListener('DOMContentLoaded', function() {
             bitsy.player().y = py;
     });
 
+    smartPatch('updateAnimation', null, function () {
+        if (bitsy.animationCounter === 0) {
+            Object.values(b3d.animatedMaterials).forEach(function (entry) {
+                var drawing = entry[0];
+                var mat = entry[1];
+                if (drawing.animation.isAnimated) {
+                    mat.diffuseTexture.uOffset = drawing.animation.frameIndex / drawing.animation.frameCount;
+                    // unfreeze material to pass updated values to the shader when rendering this frame
+                    mat.unfreeze();
+                }
+            });
+            // keep track of whether we updated animations, to freeze materials after rendering this frame
+            b3d.didUpdateAnimations = true;
+        }
+    });
+
     // adjust movement direction relative to the camera
     smartPatch('movePlayer',
         function () {
@@ -393,6 +411,9 @@ b3d.init = function () {
     b3d.scene = new BABYLON.Scene(b3d.engine);
     b3d.scene.ambientColor = new BABYLON.Color3(1, 1, 1);
     b3d.scene.freezeActiveMeshes();
+
+    // optimization: this gives noticeable boost in very large scenes
+    b3d.scene.blockMaterialDirtyMechanism = true;
 
     // set up text canvas
     b3d.textCanvas.width = bitsy.canvas.width;
@@ -1020,38 +1041,49 @@ b3d.getCache = function (cacheName, make) {
 
 b3d._tempTransparencyCanvas = document.createElement('canvas');
 b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparency) {
-    var canvas = bitsy.renderer.GetImage(drawing, pal);
+    var frameCanvases = [];
+    var numFrames = drawing.animation.isAnimated? drawing.animation.frameCount: 1;
+
+    for (var curFrame = 0; curFrame < numFrames; curFrame++) {
+        frameCanvases[curFrame] = bitsy.renderer.GetImage(drawing, pal, curFrame);
+    }
+    var frameWidth = frameCanvases[0].width;
+
+    // var canvas = bitsy.renderer.GetImage(drawing, pal);
 
     var tex = new BABYLON.DynamicTexture('test', {
-        width: canvas.width,
-        height: canvas.height,
+        width: frameWidth * numFrames,
+        height: frameCanvases[0].height,
     }, b3d.scene, false, BABYLON.Texture.NEAREST_NEAREST_MIPNEAREST);
 
     tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
 
-    if (transparency) {
-        // to create texture with transparency, swap the original bitsy drawing
-        // with the copy that will have its background-colored pixels set to be transparent
-        // original drawing should be preserved to be able to switch to non-transparent
-        // version and to avoid bugs in the editor
-        var copyCtx = b3d._tempTransparencyCanvas.getContext('2d');
-        copyCtx.drawImage(canvas, 0, 0);
-        tex.hasAlpha = true;
-        var data = copyCtx.getImageData(0, 0, canvas.width, canvas.height);
-        var bg = bitsy.getPal(pal)[0];
-        for (let i = 0; i < data.data.length; i += 4) {
-            var r = data.data[i];
-            var g = data.data[i + 1];
-            var b = data.data[i + 2];
-            if (r === bg[0] && g === bg[1] && b === bg[2]) {
-                data.data[i + 3] = 0;
+    frameCanvases.forEach(function (canvas, curFrame) {
+        if (transparency) {
+            // to create texture with transparency, swap the original bitsy drawing
+            // with the copy that will have its background-colored pixels set to be transparent
+            // original drawing should be preserved to be able to switch to non-transparent
+            // version and to avoid bugs in the editor
+            var copyCtx = b3d._tempTransparencyCanvas.getContext('2d');
+            copyCtx.drawImage(canvas, 0, 0);
+            tex.hasAlpha = true;
+            var data = copyCtx.getImageData(0, 0, canvas.width, canvas.height);
+            var bg = bitsy.getPal(pal)[0];
+            for (let i = 0; i < data.data.length; i += 4) {
+                var r = data.data[i];
+                var g = data.data[i + 1];
+                var b = data.data[i + 2];
+                if (r === bg[0] && g === bg[1] && b === bg[2]) {
+                    data.data[i + 3] = 0;
+                }
             }
+            copyCtx.putImageData(data, 0, 0);
+            var canvas = b3d._tempTransparencyCanvas;
         }
-        copyCtx.putImageData(data, 0, 0);
-        var canvas = b3d._tempTransparencyCanvas;
-    }
-    var texCtx = tex.getContext();
-    texCtx.drawImage(canvas, 0, 0);
+        var texCtx = tex.getContext();
+        texCtx.drawImage(canvas, curFrame * frameWidth, 0);
+    });
+    tex.uScale = 1/numFrames;
     tex.update();
     return tex;
 });
@@ -1063,24 +1095,30 @@ b3d.getTexture = function (drawing, pal, transparency) {
 
     var drw = drawing.drw;
     var col = drawing.col;
-    var frame = drawing.animation.frameIndex;
-    var key = `${drw},${frame},${col},${pal},${transparency}`;
+    var key = `${drw},${col},${pal},${transparency}`;
     return b3d.getTextureFromCache(key, [drawing, pal, transparency]);
 };
 
-b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal, transparency) {
+b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal, transparency, key) {
     var mat = b3d.baseMat.clone();
     mat.diffuseTexture = b3d.getTexture(drawing, pal, transparency);
-    mat.freeze();
+    if (drawing.animation.isAnimated) {
+        // make sure it's listed in the collection of animated materials, update the reference if needed
+        if (b3d.animatedMaterials[key]) {
+            b3d.animatedMaterials[key][0] = drawing;
+            b3d.animatedMaterials[key][1] = mat;
+        } else {
+            b3d.animatedMaterials[key] = [drawing, mat];
+        }
+    }
     return mat;
 });
 
 b3d.getMaterial = function (drawing, pal, transparency) {
     var drw = drawing.drw;
     var col = drawing.col;
-    var frame = drawing.animation.frameIndex;
-    var key = `${drw},${frame},${col},${pal},${transparency}`;
-    return b3d.getMaterialFromCache(key, [drawing, pal, transparency]);
+    var key = `${drw},${col},${pal},${transparency}`;
+    return b3d.getMaterialFromCache(key, [drawing, pal, transparency, key]);
 };
 
 b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, config, hidden) {
@@ -1108,15 +1146,14 @@ b3d.getMesh = function (drawing, pal, config) {
     }
     var drw = drawing.drw;
     var col = drawing.col;
-    var frame = drawing.animation.frameIndex;
     // include type in the key to account for cases when drawings that link to
     // the same 'drw' need to have different types when using with other hacks
-    var key = `${drw},${frame},${col},${pal},${config.type},${config.transparency},${hidden}`;
+    var key = `${drw},${col},${pal},${config.type},${config.transparency},${hidden}`;
     return b3d.getMeshFromCache(key, [drawing, pal, config, hidden]);
 };
 
-b3d.clearCaches = function (cachesArr, drw, frame, col, pal) {
-    var r = new RegExp(`${drw || '\\D\\D\\D_\\w+?'},${frame || '\\d*?'},${col || '\\d*?'},${pal || '\\d*'}`);
+b3d.clearCaches = function (cachesArr, drw, col, pal) {
+    var r = new RegExp(`${drw || '\\D\\D\\D_\\w+?'},${col || '\\d*?'},${pal || '\\d*'}`);
     cachesArr.forEach(function(cache) {
         Object.keys(cache)
             .filter(function(key) {return r.test(key);})
@@ -1128,15 +1165,15 @@ b3d.clearCaches = function (cachesArr, drw, frame, col, pal) {
 }
 
 b3d.clearCachesPalette = function (pal) {
-    b3d.clearCaches(Object.values(b3d.caches), null, null, null, pal);
+    b3d.clearCaches(Object.values(b3d.caches), null, null, pal);
 };
 
-b3d.clearCachesTexture = function (drw, frame) {
-    b3d.clearCaches(Object.values(b3d.caches), drw, frame, null, null);
+b3d.clearCachesTexture = function (drw) {
+    b3d.clearCaches(Object.values(b3d.caches), drw, null, null);
 };
 
 b3d.clearCachesMesh = function (drw) {
-    b3d.clearCaches([b3d.caches.mesh], drw, null, null, null);
+    b3d.clearCaches([b3d.caches.mesh], drw, null, null);
 };
 
 b3d.update = function () {
@@ -1312,6 +1349,13 @@ b3d.render = function () {
         b3d.scene.activeCamera.fov = 0;
     }
     b3d.scene.render();
+    // if we updated animations this frame, make sure to freeze animated materials again
+    if (b3d.didUpdateAnimations) {
+        Object.values(b3d.animatedMaterials).forEach(function (entry) {
+            entry[1].freeze();
+        });
+        b3d.didUpdateAnimations = false;
+    };
     b3d.scene.activeCamera.fov = fov;
 };
 
