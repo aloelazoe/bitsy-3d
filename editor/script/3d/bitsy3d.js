@@ -1051,7 +1051,7 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparenc
 
     // var canvas = bitsy.renderer.GetImage(drawing, pal);
 
-    var tex = new BABYLON.DynamicTexture('test', {
+    var tex = new BABYLON.DynamicTexture(drawing.drw, {
         width: frameWidth * numFrames,
         height: frameCanvases[0].height,
     }, b3d.scene, false, BABYLON.Texture.NEAREST_NEAREST_MIPNEAREST);
