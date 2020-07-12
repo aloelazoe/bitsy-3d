@@ -2,9 +2,11 @@ var bitsy = window;
 
 var b3d = {
     settings: {
-        engineWidth: 512,
-        engineHeight: 512,
-        engineAutoResize: true,
+        engineSize: '512x512',
+        canvasSize: 'auto',
+        // engineWidth: 512,
+        // engineHeight: 512,
+        // canvasSizeAuto: true,
 
         clearColor: 0,
 
@@ -269,6 +271,82 @@ b3d.lockPointer = function () {
     }
 };
 
+b3d.applyEngineAndCanvasSize = function (engineSizeArg, canvasSizeArg) {
+    // only apply them in exported game: editor canvas should have a fixed styling and resolution
+    if (bitsy.isPlayerEmbeddedInEditor) {
+        b3d.engine.resize();
+        return;
+    }
+
+    var engineSize = engineSizeArg? engineSizeArg.toString(): b3d.settings.engineSize;
+    var canvasSize = canvasSizeArg? canvasSizeArg.toString(): b3d.settings.canvasSize;
+
+    var engineFixed, engineAuto, engineFactor,
+        canvasFixed, canvasAuto, canvasRatio;
+
+    engineFixed = engineSize.match(/(\d+)x(\d+)/i);
+    if (!engineFixed) engineAuto = engineSize.match(/auto/i);
+    if (!engineFixed && !engineAuto) engineFactor = engineSize.match(/\d+/i);
+
+    canvasFixed = canvasSize.match(/(\d+)x(\d+)/i);
+    if (!canvasFixed) canvasAuto = canvasSize.match(/auto/i);
+    if (!canvasFixed && !canvasAuto) canvasRatio = canvasSize.match(/(\d+):(\d+)/i);
+
+    var err = '';
+    if (engineFixed || engineAuto || engineFactor) {
+        b3d.settings.engineSize = engineSize;
+    } else {
+        err += `engine size ${engineSize} is invalid. `;
+    }
+    if (canvasFixed || canvasAuto || canvasRatio) {
+        b3d.settings.canvasSize = canvasSize;
+    } else {
+        err += `canvas size ${canvasSize} is invalid`;
+    }
+    if (err) {
+        console.error(`couldn't apply engine and canvas size. ${err}`);
+        return;
+    }
+
+    if (canvasFixed) {
+        b3d.sceneCanvas.style.width = canvasFixed[1] + 'px';
+        b3d.sceneCanvas.style.height = canvasFixed[2] + 'px';
+        b3d.sceneCanvas.style.maxHeight = 'initial';
+        b3d.sceneCanvas.style.maxWidth = 'initial';
+    } else if (canvasAuto) {
+        if (engineFixed) {
+            if (parseInt(engineFixed[1]) >= parseInt(engineFixed[2])) {
+                b3d.sceneCanvas.style.width = '100vw';
+                b3d.sceneCanvas.style.height = 'initial';
+                b3d.sceneCanvas.style.maxHeight = '100vh';
+            } else {
+                b3d.sceneCanvas.style.height = '100vh';
+                b3d.sceneCanvas.style.width = 'initial';
+                b3d.sceneCanvas.style.maxWidth = '100vw';
+            }
+        } else {
+            b3d.sceneCanvas.style.width = '100vw';
+            b3d.sceneCanvas.style.height = '100vh';
+        }
+    } else if (canvasRatio) {
+        if (engineFixed) {
+            console.warning('canvas size can only be set as aspect ratio when engine size is not fixed');
+            b3d.applyEngineAndCanvasSize(engineSize, 'auto');
+            return;
+        } else {
+            // todo: implement setting canvas dimensions as aspect ratio
+        }
+    }
+
+    if (engineFixed) {
+        b3d.engine.setSize(parseInt(engineFixed[1]), parseInt(engineFixed[2]));
+    } else if (engineAuto) {
+        b3d.engine.resize();
+    } else if (engineFactor) {
+        // todo: impelement setting engine resolution as a screen resolution with the downscale factor
+    }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     // patch bitsy with bitsy 3d functions
     // ensure compatibilty with hacks in exported game by using kitsy when it's included
@@ -388,7 +466,38 @@ b3d.init = function () {
         // hide the original canvas and add a stylesheet
         // to make the 3D render in its place
         bitsy.canvas.parentElement.removeChild(bitsy.canvas);
-        var style = `html { font-size: 0; } canvas { -ms-interpolation-mode: nearest-neighbor;  image-rendering: -moz-crisp-edges;  image-rendering: pixelated; } canvas:focus { outline: none; } #gameContainer { width: 100vw; max-width: 100vh; margin: auto; } #gameContainer > * { width: 100%; height: 100%; } #gameContainer > #textCanvas { margin-top: -100%; background: none; pointer-events: none; }`;
+        var style = `
+        canvas {
+            -ms-interpolation-mode: nearest-neighbor;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: pixelated;
+        }
+        canvas:focus {
+            outline: none;
+        }
+        #gameContainer {
+            position: absolute;
+            display: inline-grid; /*to prevent it from growing a few pixels taller than sceneCanvas*/
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #sceneCanvas {
+            position: static;
+            object-fit: contain;
+            width: 100vw;
+            max-height: 100vh;
+        }
+        #textCanvas {
+            position: absolute;
+            object-fit: contain;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: none;
+            pointer-events: none;
+        }`;
         var sheet = document.createElement('style');
         sheet.textContent = style;
         document.head.appendChild(sheet);
@@ -444,7 +553,7 @@ b3d.init = function () {
 
     // watch for browser/canvas resize events
     window.addEventListener("resize", function () {
-        if (b3d.settings.engineAutoResize) b3d.engine.resize();
+        if (b3d.settings.engineSize === 'auto') b3d.engine.resize();
     });
 
     // watch for locking/unlocking the pointer
@@ -549,13 +658,7 @@ b3d.applySettings = function () {
     bitsy.playerHoldToMoveInterval = b3d.settings.movementHoldInterval;
     bitsy.playerSecondStepInterval = b3d.settings.movementSecondStepInterval;
 
-    // set engine size. these dimensions can be different from the canvas dimensions
-    // but if canvas doesn't have set dimensions, they will be set to these and will remain fixed
-    b3d.engine.setSize(b3d.settings.engineWidth, b3d.settings.engineHeight);
-    if (b3d.settings.engineAutoResize) {
-        // resize engine according to the canvas size
-        b3d.engine.resize();
-    }
+    b3d.applyEngineAndCanvasSize();
 
     // apply fog settings
     b3d.scene.fogStart = b3d.settings.fogStart;
