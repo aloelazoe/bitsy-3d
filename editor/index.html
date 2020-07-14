@@ -495,8 +495,63 @@
 						</div>
 					</div>
 
-					<div id="settings3dGame" class="controlBox" style="display: none; margin-top: 8px;">
+					<div id="settings3dGame" style="display: none; margin-top: 8px;">
 						<!-- todo: add reset button -->
+						<!-- engine size -->
+						<div class="controlBox" style="padding-bottom: 10px;">
+							<form>
+								<span>rendering resolution:</span>
+								<br/>
+								<input type="radio" name="engineSize" value="auto" onclick="meshPanel.onChangeEngineSize(event);" id="engineSizeOptionAuto" checked>
+								<label title="use display resolution" for="engineSizeOptionAuto" class="left">
+									<i class="material-icons">crop_free</i>
+									<span>auto</span>
+								</label>
+
+								<input type="radio" name="engineSize" value="fixed" onclick="meshPanel.onChangeEngineSize(event);" id="engineSizeOptionFixed">
+								<label title="set rendering resolution manually" for="engineSizeOptionFixed" class="right">
+									<i class="material-icons">crop</i>
+									<span>fixed</span>
+								</label>
+
+								<div id="engineSizeFixedInput" style="display:none; margin-top:10px;">
+									<span class="controlBox" style="margin-right:5px;">
+										width: <input type="number" min="0" value="512" style="width:60px;" id="engineWidthInput" onchange="meshPanel.onChangeEngineSize(event);"> px
+									</span>
+									<span class="controlBox">
+										height: <input type="number" min="0" value="512" style="width:60px;" id="engineHeightInput" onchange="meshPanel.onChangeEngineSize(event);"> px
+									</span>
+								</div>
+							</form>
+						</div>
+						<!-- canvas size -->
+						<div class="controlBox" style="padding-bottom: 10px;">
+							<form>
+								<span>canvas size:</span>
+								<br/>
+								<input type="radio" name="canvasSize" value="auto" onclick="meshPanel.onChangeCanvasSize(event);" id="canvasSizeOptionAuto" checked>
+								<label title="fit the screen. will maintain aspect ratio when using fixed rendering resolution" for="canvasSizeOptionAuto" class="left">
+									<i class="material-icons">crop_free</i>
+									<span>auto</span>
+								</label>
+
+								<input type="radio" name="canvasSize" value="fixed" onclick="meshPanel.onChangeCanvasSize(event);" id="canvasSizeOptionFixed">
+								<label title="set canvas size manually" for="canvasSizeOptionFixed" class="right">
+									<i class="material-icons">crop</i>
+									<span>fixed</span>
+								</label>
+
+								<div id="canvasSizeFixedInput" style="display:none; margin-top:10px;">
+									<span class="controlBox" style="margin-right:5px;">
+										width: <input type="number" min="0" value="512" style="width:60px;" id="canvasWidthInput" onchange="meshPanel.onChangeCanvasSize(event);"> px
+									</span>
+									<span class="controlBox">
+										height: <input type="number" min="0" value="512" style="width:60px;" id="canvasHeightInput" onchange="meshPanel.onChangeCanvasSize(event);"> px
+									</span>
+								</div>
+							</form>
+						</div>
+						<div id="gameSettings3dGrouped" class="controlBox"></div>
 					</div>
 
 				</div> <!-- meshPanel -->

@@ -28,7 +28,7 @@ var editor3d = {
     chaosMode: false,
 
     // lists of game settings and camera properties that require special treatment when generating ui elements
-    propertyListIgnore: ['clearColor', 'fogColor', 'tweenFunction', 'rotationTweenTime', 'rotationTweenFunction'],
+    propertyListIgnore: ['engineSize', 'canvasSize', 'clearColor', 'fogColor', 'tweenFunction', 'rotationTweenTime', 'rotationTweenFunction'],
     propertyListRadiansToDegrees: ['alpha', 'beta', 'upperBetaLimit', 'lowerBetaLimit', 'useLeftAndRightToRotateByAngle'],
 };
 
@@ -1497,7 +1497,7 @@ var meshPanel = {
         // ['engineWidth', 'engineHeight', 'engineAutoResize'].forEach(function (key) {
             var controller = new meshPanel.PropertyUIController(
                 key, b3d.settings[key],
-                document.getElementById('settings3dGame'),
+                document.getElementById('gameSettings3dGrouped'),
                 function (event) { b3d.applySettings(); }
             );
             if (key === 'enableFog') {
@@ -1512,7 +1512,7 @@ var meshPanel = {
         });
         // add a dropdown menu for tween functions
         var div = document.createElement('div');
-        document.getElementById('settings3dGame').appendChild(div);
+        document.getElementById('gameSettings3dGrouped').appendChild(div);
         var label = document.createElement('label');
         div.appendChild(label);
         label.innerHTML = 'tween function: ';
@@ -1535,10 +1535,88 @@ var meshPanel = {
     },
 
     updateGameSettings: function () {
+        var engineSize = b3d.parseSize(b3d.settings.engineSize);
+        switch (engineSize.type) {
+            case 'auto':
+                document.getElementById('engineSizeOptionAuto').checked = 'true';
+                document.getElementById('engineSizeFixedInput').style.display = 'none';
+                break;
+            case 'fixed':
+                document.getElementById('engineSizeOptionFixed').checked = 'true';
+                document.getElementById('engineSizeFixedInput').style.display = 'block';
+                document.getElementById('engineWidthInput').value = engineSize.width;
+                document.getElementById('engineHeightInput').value = engineSize.height;
+                break;
+            case 'factor':
+                // todo: implement engine size with a downscale factor
+                break;
+        }
+
+        var canvasSize = b3d.parseSize(b3d.settings.canvasSize);
+        switch (canvasSize.type) {
+            case 'auto':
+                document.getElementById('canvasSizeOptionAuto').checked = 'true';
+                document.getElementById('canvasSizeFixedInput').style.display = 'none';
+                break;
+            case 'fixed':
+                document.getElementById('canvasSizeOptionFixed').checked = 'true';
+                document.getElementById('canvasSizeFixedInput').style.display = 'block';
+                document.getElementById('canvasWidthInput').value = canvasSize.width;
+                document.getElementById('canvasHeightInput').value = canvasSize.height;
+                break;
+            case 'ratio':
+                // todo: implement canvas size as an aspect ratio
+                break;
+        }
+
+        var canvasSize = b3d.parseSize(b3d.settings.canvasSize);
+
         document.getElementById('settings3dTweenFunction').value = b3d.settings.tweenFunction;
         meshPanel.gameSettingsControllers.forEach(function (controller) {
             controller.update(b3d.settings);
         });
+    },
+
+    onChangeEngineSize: function (event) {
+        console.log('changed engine size');
+        var newEngineSize;
+        // todo: implement engine size with a downscale factor
+        switch (event.target.id) {
+            case 'engineSizeOptionAuto':
+                document.getElementById('engineSizeFixedInput').style.display = 'none';
+                newEngineSize = 'auto';
+                break;
+            case 'engineSizeOptionFixed':
+                document.getElementById('engineSizeFixedInput').style.display = 'block';
+            case 'engineWidthInput':
+            case 'engineHeightInput':
+                newEngineSize = `${document.getElementById('engineWidthInput').value}x${document.getElementById('engineHeightInput').value}`;
+                break;
+        }
+        console.log(newEngineSize);
+        b3d.settings.engineSize = newEngineSize || b3d.settings.engineSize;
+        refreshGameData();
+    },
+
+    onChangeCanvasSize: function (event) {
+        console.log('changed canvas size');
+        var newCanvasSize;
+        // todo: implement canvas size as an aspect ratio
+        switch (event.target.id) {
+            case 'canvasSizeOptionAuto':
+                document.getElementById('canvasSizeFixedInput').style.display = 'none';
+                newCanvasSize = 'auto';
+                break;
+            case 'canvasSizeOptionFixed':
+                document.getElementById('canvasSizeFixedInput').style.display = 'block';
+            case 'canvasWidthInput':
+            case 'canvasHeightInput':
+                newCanvasSize = `${document.getElementById('canvasWidthInput').value}x${document.getElementById('canvasHeightInput').value}`;
+                break;
+        }
+        console.log(newCanvasSize);
+        b3d.settings.canvasSize = newCanvasSize || b3d.settings.canvasSize;
+        refreshGameData();
     },
 
     toggleAdvancedCameraSettings: function (event) {

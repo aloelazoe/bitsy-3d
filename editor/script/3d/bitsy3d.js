@@ -4,9 +4,6 @@ var b3d = {
     settings: {
         engineSize: '512x512',
         canvasSize: 'auto',
-        // engineWidth: 512,
-        // engineHeight: 512,
-        // canvasSizeAuto: true,
 
         clearColor: 0,
 
@@ -271,79 +268,86 @@ b3d.lockPointer = function () {
     }
 };
 
+b3d.parseSize = function (sizeStr) {
+    if (!sizeStr) return;
+    var match;
+    if (match = sizeStr.match(/auto/)) {
+        return { type: 'auto' };
+    } else if (match = sizeStr.match(/(\d+)x(\d+)/)) {
+        return { type: 'fixed', width: match[1], height: match[2] };
+    } else if (match = sizeStr.match(/(\d+):(\d+)/)) {
+        return { type: 'ratio', width: match[1], height: match[2] };
+    } else if (match = sizeStr.match(/\d+/)) {
+        return { type: 'factor', value: match[0] };
+    } else {
+        console.error(`invalid size option: ${sizeStr}`);
+        return;
+    }
+};
+
 b3d.applyEngineAndCanvasSize = function (engineSizeArg, canvasSizeArg) {
-    // only apply them in exported game: editor canvas should have a fixed styling and resolution
+    // only apply them in exported game: editor canvas should have fixed styling and resolution
     if (bitsy.isPlayerEmbeddedInEditor) {
         b3d.engine.resize();
         return;
     }
 
-    var engineSize = engineSizeArg? engineSizeArg.toString(): b3d.settings.engineSize;
-    var canvasSize = canvasSizeArg? canvasSizeArg.toString(): b3d.settings.canvasSize;
+    var engineSize = b3d.parseSize(engineSizeArg) || b3d.parseSize(b3d.settings.engineSize);
+    var canvasSize = b3d.parseSize(canvasSizeArg) || b3d.parseSize(b3d.settings.canvasSize);
 
-    var engineFixed, engineAuto, engineFactor,
-        canvasFixed, canvasAuto, canvasRatio;
-
-    engineFixed = engineSize.match(/(\d+)x(\d+)/i);
-    if (!engineFixed) engineAuto = engineSize.match(/auto/i);
-    if (!engineFixed && !engineAuto) engineFactor = engineSize.match(/\d+/i);
-
-    canvasFixed = canvasSize.match(/(\d+)x(\d+)/i);
-    if (!canvasFixed) canvasAuto = canvasSize.match(/auto/i);
-    if (!canvasFixed && !canvasAuto) canvasRatio = canvasSize.match(/(\d+):(\d+)/i);
-
-    var err = '';
-    if (engineFixed || engineAuto || engineFactor) {
-        b3d.settings.engineSize = engineSize;
-    } else {
-        err += `engine size ${engineSize} is invalid. `;
+    if (!engineSize || ['fixed', 'auto', 'factor'].indexOf(engineSize.type) === -1) {
+        engineSize = { type: 'auto' };
+        console.warning('engine size is invalid. resetting to auto');
     }
-    if (canvasFixed || canvasAuto || canvasRatio) {
-        b3d.settings.canvasSize = canvasSize;
-    } else {
-        err += `canvas size ${canvasSize} is invalid`;
-    }
-    if (err) {
-        console.error(`couldn't apply engine and canvas size. ${err}`);
-        return;
+    if (!canvasSize || ['fixed', 'auto', 'ratio'].indexOf(canvasSize.type) === -1) {
+        canvasSize = { type: 'auto' };
+        console.warning('canvas size is invalid. resetting to auto');
     }
 
-    if (canvasFixed) {
-        b3d.sceneCanvas.style.width = canvasFixed[1] + 'px';
-        b3d.sceneCanvas.style.height = canvasFixed[2] + 'px';
-        b3d.sceneCanvas.style.maxHeight = 'initial';
-        b3d.sceneCanvas.style.maxWidth = 'initial';
-    } else if (canvasAuto) {
-        if (engineFixed) {
-            if (parseInt(engineFixed[1]) >= parseInt(engineFixed[2])) {
-                b3d.sceneCanvas.style.width = '100vw';
-                b3d.sceneCanvas.style.height = 'initial';
-                b3d.sceneCanvas.style.maxHeight = '100vh';
+    switch (canvasSize.type) {
+        case 'fixed':
+            b3d.sceneCanvas.style.width = canvasSize.width + 'px';
+            b3d.sceneCanvas.style.height = canvasSize.height + 'px';
+            b3d.sceneCanvas.style.maxHeight = 'initial';
+            b3d.sceneCanvas.style.maxWidth = 'initial';
+            break;
+        case 'auto':
+            if (engineSize.type === 'fixed') {
+                if (parseInt(engineSize.width) >= parseInt(engineSize.height)) {
+                    b3d.sceneCanvas.style.width = '100vw';
+                    b3d.sceneCanvas.style.height = 'initial';
+                    b3d.sceneCanvas.style.maxHeight = '100vh';
+                } else {
+                    b3d.sceneCanvas.style.height = '100vh';
+                    b3d.sceneCanvas.style.width = 'initial';
+                    b3d.sceneCanvas.style.maxWidth = '100vw';
+                }
             } else {
+                b3d.sceneCanvas.style.width = '100vw';
                 b3d.sceneCanvas.style.height = '100vh';
-                b3d.sceneCanvas.style.width = 'initial';
-                b3d.sceneCanvas.style.maxWidth = '100vw';
             }
-        } else {
-            b3d.sceneCanvas.style.width = '100vw';
-            b3d.sceneCanvas.style.height = '100vh';
-        }
-    } else if (canvasRatio) {
-        if (engineFixed) {
-            console.warning('canvas size can only be set as aspect ratio when engine size is not fixed');
-            b3d.applyEngineAndCanvasSize(engineSize, 'auto');
-            return;
-        } else {
-            // todo: implement setting canvas dimensions as aspect ratio
-        }
+            break;
+        case 'ratio':
+            if (engineSize.type === 'fixed') {
+                console.warning('canvas size can only be set as aspect ratio when engine size is not fixed');
+                b3d.applyEngineAndCanvasSize(engineSizeArg, 'auto');
+                return;
+            } else {
+                // todo: implement setting canvas dimensions as aspect ratio
+            }
+            break;
     }
 
-    if (engineFixed) {
-        b3d.engine.setSize(parseInt(engineFixed[1]), parseInt(engineFixed[2]));
-    } else if (engineAuto) {
-        b3d.engine.resize();
-    } else if (engineFactor) {
-        // todo: impelement setting engine resolution as a screen resolution with the downscale factor
+    switch (engineSize.type) {
+        case 'fixed':
+            b3d.engine.setSize(parseInt(engineSize.width), parseInt(engineSize.height));
+            break;
+        case 'auto':
+            b3d.engine.resize();
+            break;
+        case 'factor':
+            // todo: impelement setting engine resolution as a screen resolution with the downscale factor
+            break;
     }
 };
 
