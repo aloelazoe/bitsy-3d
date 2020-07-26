@@ -28,7 +28,7 @@ var editor3d = {
     chaosMode: false,
 
     // lists of game settings and camera properties that require special treatment when generating ui elements
-    propertyListIgnore: ['engineSize', 'canvasSize', 'clearColor', 'fogColor', 'tweenFunction', 'rotationTweenTime', 'rotationTweenFunction'],
+    propertyListIgnore: ['engineSize', 'canvasSize', 'clearColor', 'fogColor', 'tweenFunction', 'mode', 'rotationTweenTime', 'rotationTweenFunction'],
     propertyListRadiansToDegrees: ['alpha', 'beta', 'upperBetaLimit', 'lowerBetaLimit', 'useLeftAndRightToRotateByAngle'],
 };
 
@@ -1907,6 +1907,7 @@ var meshPanel = {
     updateCameraSettings: function () {
         document.getElementById('settings3dCameraPreset').value = b3d.curCameraPreset || 'custom';
         document.getElementById('settings3dCameraType').value = b3d.mainCamera.type;
+        document.getElementById('settings3dCameraMode').value = b3d.mainCamera.mode;
         meshPanel.cameraSettingsControllers.forEach(function (controller) {
             controller.update(b3d.mainCamera);
         });
@@ -1994,6 +1995,12 @@ var meshPanel = {
 
         meshPanel.updateCameraSettings();
         meshPanel.hideCameraSettingsControllables();
+        bitsy.refreshGameData();
+    },
+
+    onChangeCameraMode: function (event) {
+        meshPanel.makeCameraPresetCustom();
+        b3d.mainCamera.mode = event.target.value;
         bitsy.refreshGameData();
     },
 }; // meshPanel
