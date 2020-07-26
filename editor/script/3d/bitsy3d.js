@@ -475,7 +475,6 @@ b3d.patch = function (scope, name, before, after) {
     }
     scope[name] = patched;
 };
-b3d._patchContext = {};
 
 b3d.init = function () {    
     if (bitsy.isPlayerEmbeddedInEditor) {

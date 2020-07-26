@@ -373,19 +373,20 @@ editor3d.init = function() {
         editor3d.reInit3dData();
     });
 
+    var tempDeletedRoom;
     // patch delete room function to fix crash when deleting rooms from vanilla room panel
     b3d.patch(bitsy, 'deleteRoom',
         function () {
-            b3d._patchContext.deletedRoom = bitsy.curRoom;
+            tempDeletedRoom = bitsy.curRoom;
         },
         function () {
             // check if the room was actually deleted after the dialog
-            var deletedRoom = b3d._patchContext.deletedRoom;
+            var deletedRoom = tempDeletedRoom;
             if (bitsy.curRoom !== deletedRoom) {
                 b3d.unregisterRoomFromStack(deletedRoom);
                 bitsy.refreshGameData();
             }
-            delete b3d._patchContext.deletedRoom;
+            tempDeletedRoom = undefined;
         }
     );
 
@@ -404,17 +405,18 @@ editor3d.init = function() {
             b3d.meshConfig[drawing.drw] = b3d.parseMesh(drawing, b3d.serializeMesh(b3d.meshConfig[duplicatedFromThisDrw]));
         }
     );
+    var tempDeletedDrawingId;
     b3d.patch(bitsy, 'deleteDrawing',
        function () {
-            b3d._patchContext.deletedDrawingId = bitsy.drawing.getEngineObject().drw;
+            tempDeletedDrawingId = bitsy.drawing.getEngineObject().drw;
         },
         function () {
-            delete b3d.meshConfig[b3d._patchContext.deletedDrawingId];
-            b3d.clearCachesTexture(b3d._patchContext.deletedDrawingId);
+            delete b3d.meshConfig[tempDeletedDrawingId];
+            b3d.clearCachesTexture(tempDeletedDrawingId);
             Object.keys(b3d.animatedMaterials).forEach(function (key) {
-                if (key.indexOf(b3d._patchContext.deletedDrawingId) !== -1) delete b3d.animatedMaterials[key];
+                if (key.indexOf(tempDeletedDrawingId) !== -1) delete b3d.animatedMaterials[key];
             });
-            delete b3d._patchContext.deletedDrawingId;
+            tempDeletedDrawingId = undefined;
         }
     );
 
