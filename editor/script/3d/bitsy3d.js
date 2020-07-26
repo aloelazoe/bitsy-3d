@@ -64,7 +64,7 @@ var b3d = {
 
     isPointerLocked: false,
 
-    defaultCameraPreset: 'orbiting follower',
+    defaultCameraPreset: 'fixed target orbiter',
 };
 
 b3d.tweenFunctions = {
