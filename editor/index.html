@@ -430,11 +430,15 @@
 								</select>
 							</div>
 							<div id="meshTransparency" title="check if background color on this mesh should be made transparent">
-								<label for="meshTransparencyCheck">transparency</label>:
+								<label for="meshTransparencyCheck">transparent background</label>:
 								<input type="checkbox" id="meshTransparencyCheck" style="display:initial" onchange="meshPanel.onChangeTransparency();">
 							</div>
+							<div class="meshAlpha" title="how opaque or translucent all non-transparent colors on this mesh should be">
+								<label for="meshAlphaInput">opacity:</label>
+								<input id="meshAlphaInput" type="number" value="1" min="0" max="1" step="0.01" style="width: 50px" onchange="meshPanel.onChangeAlpha(event);">
+							</div>
 							<div id="meshHidden" title="check if this drawing should only be visible in the editor">
-								<label for="meshHiddenCheck">hidden</label>:
+								<label for="meshHiddenCheck">hidden - only show in editor</label>:
 								<input type="checkbox" id="meshHiddenCheck" style="display:initial" onchange="meshPanel.onChangeHidden();">
 							</div>
 
