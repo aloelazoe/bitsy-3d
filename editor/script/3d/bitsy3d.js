@@ -271,18 +271,22 @@ b3d.lockPointer = function () {
 b3d.parseSize = function (sizeStr) {
     if (!sizeStr) return;
     var match;
-    if (match = sizeStr.match(/auto/)) {
-        return { type: 'auto' };
-    } else if (match = sizeStr.match(/(\d+)x(\d+)/)) {
-        return { type: 'fixed', width: match[1], height: match[2] };
-    } else if (match = sizeStr.match(/(\d+):(\d+)/)) {
-        return { type: 'ratio', width: match[1], height: match[2] };
-    } else if (match = sizeStr.match(/\d+/)) {
-        return { type: 'factor', value: match[0] };
+    var parsed;
+    if (match = sizeStr.match(/^auto/)) {
+        parsed = { type: 'auto' };
+    } else if (match = sizeStr.match(/^(\d+)x(\d+)/)) {
+        parsed = { type: 'fixed', width: match[1], height: match[2] };
+    } else if (match = sizeStr.match(/^(\d+):(\d+)/)) {
+        parsed = { type: 'ratio', width: match[1], height: match[2] };
+    } else if (match = sizeStr.match(/^\d+/)) {
+        parsed = { type: 'factor', value: match[0] };
     } else {
         console.error(`invalid size option: ${sizeStr}`);
-        return;
+        parsed = { type: 'invalid' };
     }
+    // include serialized version
+    parsed.serialized = sizeStr;
+    return parsed;
 };
 
 b3d.applyEngineAndCanvasSize = function (engineSizeArg, canvasSizeArg) {
@@ -295,14 +299,20 @@ b3d.applyEngineAndCanvasSize = function (engineSizeArg, canvasSizeArg) {
     var engineSize = b3d.parseSize(engineSizeArg) || b3d.parseSize(b3d.settings.engineSize);
     var canvasSize = b3d.parseSize(canvasSizeArg) || b3d.parseSize(b3d.settings.canvasSize);
 
-    if (!engineSize || ['fixed', 'auto', 'factor'].indexOf(engineSize.type) === -1) {
-        engineSize = { type: 'auto' };
-        console.warning('engine size is invalid. resetting to auto');
+    // todo: implement 'factor' size for engine and 'ratio' size for canvas
+    // for now only accept 'fixed' and 'auto' as valid types for both engine and canvas
+    if (!engineSize || ['fixed', 'auto'].indexOf(engineSize.type) === -1) {
+        console.warn(`engine size "${engineSize.serialized}" is invalid. resetting to auto`);
+        engineSize = b3d.parseSize('auto');
     }
-    if (!canvasSize || ['fixed', 'auto', 'ratio'].indexOf(canvasSize.type) === -1) {
-        canvasSize = { type: 'auto' };
-        console.warning('canvas size is invalid. resetting to auto');
+    if (!canvasSize || ['fixed', 'auto'].indexOf(canvasSize.type) === -1) {
+        console.warn(`canvas size "${canvasSize.serialized}" is invalid. resetting to auto`);
+        canvasSize = b3d.parseSize('auto');
     }
+
+    // set engine and canvas size in the settings for consistency
+    b3d.settings.engineSize = engineSize.serialized;
+    b3d.settings.canvasSize = canvasSize.serialized;
 
     switch (canvasSize.type) {
         case 'fixed':
@@ -557,7 +567,9 @@ b3d.init = function () {
 
     // watch for browser/canvas resize events
     window.addEventListener("resize", function () {
-        if (b3d.settings.engineSize === 'auto') b3d.engine.resize();
+        if (b3d.settings.engineSize === 'auto' || b3d.settings.canvasSize === 'auto') {
+            b3d.applyEngineAndCanvasSize();
+        }
     });
 
     // watch for locking/unlocking the pointer
