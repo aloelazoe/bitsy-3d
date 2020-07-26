@@ -151,6 +151,9 @@ b3d.cameraPresets = {
 b3d.cameraDataModel = {
     commonProperties: {
         value: {
+            // mode can be either 'perspective' or 'orthographic'
+            mode: 'perspective',
+            orthoSize: 16,
             fov: 0.9,
             minZ: 0.001,
             maxZ: 100,
@@ -359,6 +362,9 @@ b3d.applyEngineAndCanvasSize = function (engineSizeArg, canvasSizeArg) {
             // todo: impelement setting engine resolution as a screen resolution with the downscale factor
             break;
     }
+
+    // make sure orthographic camera preserves aspect ratio correctly
+    if (b3d.mainCamera) b3d.mainCamera.recalculateOrthoBounds();
 };
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -733,6 +739,56 @@ b3d.createCamera = function (camData) {
                     this.ref[k] = a;
                 },
             });
+        // define special properties that need custom setters
+        } else if (k === 'mode') {
+            var internalValue;
+            Object.defineProperty(camera, 'mode', {
+                configurable: true,
+                enumerable: true,
+                get: function () { return internalValue; },
+                set: function (a) {
+                    internalValue = a;
+                    if (a === 'perspective') {
+                        this.ref.mode = BABYLON.Camera.PERSPECTIVE_CAMERA;
+                    } else if (a === 'orthographic') {
+                        this.ref.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+                    }
+                },
+            });
+        } else if (k === 'orthoSize') {
+            Object.defineProperty(camera, 'recalculateOrthoBounds', {
+                // adjust orthographic boundaries according to the orthoSize and aspect ratio
+                configurable: false,
+                enumerable: false,
+                writable: false,
+                value: function () {
+                    // figure out aspect ratio
+                    var widthFactor = 1;
+                    var heightFactor = 1;
+                    var ratio = this.ref.getEngine().getRenderWidth() / this.ref.getEngine().getRenderHeight();
+                    if (ratio >= 1) {
+                        widthFactor = ratio;
+                    } else {
+                        heightFactor = 1 / ratio;
+                    }
+                    // divide orthoSize by two for each dimension
+                    this.ref.orthoLeft = -(this.orthoSize * widthFactor) / 2;
+                    this.ref.orthoRight = (this.orthoSize * widthFactor) / 2;
+                    this.ref.orthoTop = (this.orthoSize * heightFactor) / 2;
+                    this.ref.orthoBottom = -(this.orthoSize * heightFactor) / 2;
+                },
+            });
+            var internalValue;
+            Object.defineProperty(camera, 'orthoSize', {
+                configurable: true,
+                enumerable: true,
+                get: function () { return internalValue; },
+                set: function (a) {
+                    internalValue = a;
+                    this.recalculateOrthoBounds();
+                },
+            });
+        // define regular properties
         } else {
             Object.defineProperty(camera, k, {
                 configurable: true,
@@ -741,6 +797,8 @@ b3d.createCamera = function (camData) {
                 set: function (a) { this.ref[k] = a; },
             });
         }
+
+        // set properties
         if (camData[k] !== undefined) {
             camera[k] = camData[k];
         } else {
