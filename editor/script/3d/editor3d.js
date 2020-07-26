@@ -161,7 +161,7 @@ editor3d.init = function() {
         alpha: Math.PI * 1.5,
         beta: Math.PI / 3,
         radius: 26,
-        target: {x:8, y:0, z:8},
+        target: {x:7.5, y:0, z:7.5},
         minZ: 0.001,
         maxZ: bitsy.mapsize * 5,
         wheelPrecision: bitsy.mapsize,

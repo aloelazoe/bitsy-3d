@@ -82,7 +82,7 @@ b3d.cameraPresets = {
         type: 'arc',
         fov: 0.9,
         inertia: 0.7,
-        target: {x: 8, z: 8, y: 3},
+        target: {x: 7.5, z: 7.5, y: 3},
         alpha: -Math.PI/2,
         beta: Math.PI/3,
         radius: 6,
@@ -97,7 +97,7 @@ b3d.cameraPresets = {
         type: 'arc',
         fov: 0.9,
         inertia: 0.7,
-        target: {x: 8, z: 8, y: 1.5},
+        target: {x: 7.5, z: 7.5, y: 1.5},
         alpha: -Math.PI/2,
         beta: Math.PI/3,
         radius: 20,
@@ -173,7 +173,7 @@ b3d.cameraDataModel = {
                 rotationTweenTime: 250,
                 rotationTweenFunction: 'linear',
             },
-            vector3: { target: {x: 8, z: 8, y: 0} },
+            vector3: { target: {x: 7.5, z: 7.5, y: 0} },
             trait: {
                 attachControl: false,
                 useLeftAndRightToRotateByAngle: 0
