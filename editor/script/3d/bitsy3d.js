@@ -647,7 +647,7 @@ b3d.parseDataFromDialog = function () {
 
 b3d.parseData = b3d.parseDataFromDialog;
 
-// all objects must have drawing, type, and transparency properties set by b3d.getDefaultMeshProps,
+// all objects will have drawing, type, transparency, hidden and alpha set by b3d.getDefaultMeshProps,
 // and other properties are optional
 b3d.parseMesh = function (drawing, parsedConfig) {
     var config = b3d.getDefaultMeshProps(drawing);
@@ -656,6 +656,7 @@ b3d.parseMesh = function (drawing, parsedConfig) {
     config.transform = parsedConfig.transform && b3d.transformFromArray(parsedConfig.transform.split(','));
     config.replacement = parsedConfig.replacement && b3d.getDrawingFromDrw(parsedConfig.replacement);
     config.hidden = parsedConfig.hasOwnProperty('hidden') ? parsedConfig.hidden : config.hidden;
+    config.alpha = parsedConfig.hasOwnProperty('alpha') ? parsedConfig.alpha : config.alpha;
     if (parsedConfig.children && parsedConfig.children.length > 0) {
         config.children = [];
         parsedConfig.children.forEach(function (c) {
@@ -928,6 +929,7 @@ b3d.getDefaultMeshProps = function (drawing) {
         type: b3d.getDefaultMeshType(drawing),
         transparency: b3d.getDefaultTransparency(drawing),
         hidden: false,
+        alpha: 1,
     };
 };
 
@@ -1062,6 +1064,9 @@ b3d.serializeMesh = function (meshConfig) {
     }
     if (meshConfig.hidden) {
         configSerialized.hidden = meshConfig.hidden;
+    }
+    if (meshConfig.hasOwnProperty('alpha') && meshConfig.alpha !== 1) {
+        configSerialized.alpha = meshConfig.alpha;
     }
     if (meshConfig.children && meshConfig.children.length > 0) {
         configSerialized.children = [];
@@ -1276,7 +1281,9 @@ b3d.getTexture = function (drawing, pal, transparency) {
     return b3d.getTextureFromCache(key, [drawing, pal, transparency]);
 };
 
-b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal, transparency, key) {
+b3d.matAlphaSetList = [];
+b3d.matAlphaFreezeList = [];
+b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal, transparency, alpha, key) {
     var mat = b3d.baseMat.clone();
     mat.diffuseTexture = b3d.getTexture(drawing, pal, transparency);
     if (drawing.animation.isAnimated) {
@@ -1288,14 +1295,19 @@ b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal, transpare
             b3d.animatedMaterials[key] = [drawing, mat];
         }
     }
+    // workaround for babylon quirks when setting material alpha: do it after the initial render
+    if (alpha !== 1) {
+        mat.unfreeze();
+        b3d.matAlphaSetList.push([key, alpha]);
+    }
     return mat;
 });
 
-b3d.getMaterial = function (drawing, pal, transparency) {
+b3d.getMaterial = function (drawing, pal, transparency, alpha) {
     var drw = drawing.drw;
     var col = drawing.col;
-    var key = `${drw},${col},${pal},${transparency}`;
-    return b3d.getMaterialFromCache(key, [drawing, pal, transparency, key]);
+    var key = `${drw},${col},${pal},${transparency},${alpha}`;
+    return b3d.getMaterialFromCache(key, [drawing, pal, transparency, alpha, key]);
 };
 
 b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, config, hidden) {
@@ -1307,7 +1319,7 @@ b3d.getMeshFromCache = b3d.getCache('mesh', function (drawing, pal, config, hidd
     }
     mesh.makeGeometryUnique();
     mesh.isVisible = false;
-    mesh.material = b3d.getMaterial(drawing, pal, config.transparency);
+    mesh.material = b3d.getMaterial(drawing, pal, config.transparency, config.alpha);
     // enable vertical tiling for towers
     if (config.type.startsWith('tower')) {
         mesh.material.diffuseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
@@ -1325,7 +1337,7 @@ b3d.getMesh = function (drawing, pal, config) {
     var col = drawing.col;
     // include type in the key to account for cases when drawings that link to
     // the same 'drw' need to have different types when using with other hacks
-    var key = `${drw},${col},${pal},${config.type},${config.transparency},${hidden}`;
+    var key = `${drw},${col},${pal},${config.type},${config.transparency},${config.alpha},${hidden}`;
     return b3d.getMeshFromCache(key, [drawing, pal, config, hidden]);
 };
 
@@ -1526,6 +1538,27 @@ b3d.render = function () {
         b3d.scene.activeCamera.fov = 0;
     }
     b3d.scene.render();
+
+    // workaround for babylon quirks when setting material alpha: do it after the initial render
+    // and these materials could be freezed only after yet another render for alpha to be applied properly
+    if (b3d.matAlphaFreezeList.length > 0) {
+        b3d.matAlphaFreezeList.forEach(function (matKey) {
+            var mat = b3d.caches.mat[matKey];
+            if (mat) mat.freeze();
+        });
+        b3d.matAlphaFreezeList = [];
+    }
+    if (b3d.matAlphaSetList.length > 0) {
+        b3d.matAlphaSetList.forEach(function (matEntry) {
+            var mat = b3d.caches.mat[matEntry[0]];
+            if (mat) {
+                mat.alpha = matEntry[1];
+                b3d.matAlphaFreezeList.push(matEntry[0]);
+            }
+        });
+        b3d.matAlphaSetList = [];
+    }
+
     // if we updated animations this frame, make sure to freeze animated materials again
     if (b3d.didUpdateAnimations) {
         Object.values(b3d.animatedMaterials).forEach(function (entry) {
