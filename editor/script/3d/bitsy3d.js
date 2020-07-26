@@ -1,7 +1,7 @@
 var bitsy = window;
 
 var b3d = {
-    settings: {
+    defaultSettings: {
         engineSize: '512x512',
         canvasSize: 'auto',
 
@@ -616,8 +616,9 @@ b3d.parseDataFromDialog = function () {
         });
     }
 
+    b3d.settings = JSON.parse(JSON.stringify(b3d.defaultSettings));
     if (parsed && parsed.settings) {
-        Object.keys(b3d.settings).forEach(function (key) {
+        Object.keys(b3d.defaultSettings).forEach(function (key) {
             if (parsed.settings[key] !== null && parsed.settings[key] !== undefined) {
                 b3d.settings[key] = parsed.settings[key];
             }
