@@ -1222,7 +1222,7 @@ b3d.getCache = function (cacheName, make) {
 };
 
 b3d._tempTransparencyCanvas = document.createElement('canvas');
-b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparency) {
+b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparency, alpha) {
     var frameCanvases = [];
     var numFrames = drawing.animation.isAnimated? drawing.animation.frameCount: 1;
 
@@ -1241,7 +1241,7 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparenc
     tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
 
     frameCanvases.forEach(function (canvas, curFrame) {
-        if (transparency) {
+        if (transparency || alpha < 1) {
             // to create texture with transparency, swap the original bitsy drawing
             // with the copy that will have its background-colored pixels set to be transparent
             // original drawing should be preserved to be able to switch to non-transparent
@@ -1255,8 +1255,10 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparenc
                 var r = data.data[i];
                 var g = data.data[i + 1];
                 var b = data.data[i + 2];
-                if (r === bg[0] && g === bg[1] && b === bg[2]) {
+                if (transparency && r === bg[0] && g === bg[1] && b === bg[2]) {
                     data.data[i + 3] = 0;
+                } else if (alpha < 1) {
+                    data.data[i + 3] = Math.round(alpha * 255);
                 }
             }
             copyCtx.putImageData(data, 0, 0);
@@ -1270,22 +1272,20 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparenc
     return tex;
 });
 
-b3d.getTexture = function (drawing, pal, transparency) {
+b3d.getTexture = function (drawing, pal, transparency, alpha) {
     // apply drawing replacement
     var altDrawing = b3d.meshConfig[drawing.drw].replacement;
     drawing = altDrawing && altDrawing || drawing;
 
     var drw = drawing.drw;
     var col = drawing.col;
-    var key = `${drw},${col},${pal},${transparency}`;
-    return b3d.getTextureFromCache(key, [drawing, pal, transparency]);
+    var key = `${drw},${col},${pal},${transparency},${alpha}`;
+    return b3d.getTextureFromCache(key, [drawing, pal, transparency, alpha]);
 };
 
-b3d.matAlphaSetList = [];
-b3d.matAlphaFreezeList = [];
 b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal, transparency, alpha, key) {
     var mat = b3d.baseMat.clone();
-    mat.diffuseTexture = b3d.getTexture(drawing, pal, transparency);
+    mat.diffuseTexture = b3d.getTexture(drawing, pal, transparency, alpha);
     if (drawing.animation.isAnimated) {
         // make sure it's listed in the collection of animated materials, update the reference if needed
         if (b3d.animatedMaterials[key]) {
@@ -1295,10 +1295,8 @@ b3d.getMaterialFromCache = b3d.getCache('mat', function (drawing, pal, transpare
             b3d.animatedMaterials[key] = [drawing, mat];
         }
     }
-    // workaround for babylon quirks when setting material alpha: do it after the initial render
-    if (alpha !== 1) {
-        mat.unfreeze();
-        b3d.matAlphaSetList.push([key, alpha]);
+    if (alpha < 1) {
+        mat.useAlphaFromDiffuseTexture = true;
     }
     return mat;
 });
@@ -1538,26 +1536,6 @@ b3d.render = function () {
         b3d.scene.activeCamera.fov = 0;
     }
     b3d.scene.render();
-
-    // workaround for babylon quirks when setting material alpha: do it after the initial render
-    // and these materials could be freezed only after yet another render for alpha to be applied properly
-    if (b3d.matAlphaFreezeList.length > 0) {
-        b3d.matAlphaFreezeList.forEach(function (matKey) {
-            var mat = b3d.caches.mat[matKey];
-            if (mat) mat.freeze();
-        });
-        b3d.matAlphaFreezeList = [];
-    }
-    if (b3d.matAlphaSetList.length > 0) {
-        b3d.matAlphaSetList.forEach(function (matEntry) {
-            var mat = b3d.caches.mat[matEntry[0]];
-            if (mat) {
-                mat.alpha = matEntry[1];
-                b3d.matAlphaFreezeList.push(matEntry[0]);
-            }
-        });
-        b3d.matAlphaSetList = [];
-    }
 
     // if we updated animations this frame, make sure to freeze animated materials again
     if (b3d.didUpdateAnimations) {

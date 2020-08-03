@@ -1398,9 +1398,7 @@ var meshPanel = {
 
     onChangeTransparency: function() {
         meshPanel.getCurMeshConfig().transparency = meshPanel.transparencyCheckEl.checked;
-        b3d.clearCachesTexture(bitsy.drawing.getEngineObject().drw);
-        b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
-        // b3d.clearCaches(Object.values(b3d.caches));
+        b3d.clearCachesTexture(meshPanel.getCurMeshConfig().drawing.drw);
         bitsy.refreshGameData();
     },
 
@@ -1411,7 +1409,7 @@ var meshPanel = {
         } else {
             meshPanel.alphaInputEl.value = meshPanel.getCurMeshConfig().alpha;
         }
-        b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
+        b3d.clearCachesTexture(meshPanel.getCurMeshConfig().drawing.drw);
         bitsy.refreshGameData();
     },
 
