@@ -439,6 +439,8 @@ document.addEventListener('DOMContentLoaded', function() {
             bitsy.curPlayerDirection = b3d.rawDirection;
     });
 
+    smartPatch('reset_cur_game', null, b3d.reInit3dData);
+
     function tryAddingToKitsyQueue(key, kind, func) {
         if (window.kitsy) {
             var queue;
@@ -646,6 +648,25 @@ b3d.parseDataFromDialog = function () {
 }; // b3d.parseDataFromDialog ()
 
 b3d.parseData = b3d.parseDataFromDialog;
+
+b3d.reInit3dData = function () {
+    // clear all caches to force all drawings to reset during the update
+    b3d.clearCaches(Object.values(b3d.caches));
+    
+    // since there is no way to tell what exactly was changed, reset everything
+    // reset stack objects
+    b3d.roomsInStack = {};
+    b3d.stackPosOfRoom = {};
+    b3d.meshConfig = {};
+
+    // delete camera
+    b3d.mainCamera.deactivate();
+    b3d.mainCamera.ref.dispose();
+    b3d.mainCamera = null;
+
+    // reload data
+    b3d.parseData();
+};
 
 // all objects will have drawing, type, transparency, hidden and alpha set by b3d.getDefaultMeshProps,
 // and other properties are optional

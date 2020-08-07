@@ -511,26 +511,12 @@ editor3d.updateTextureOneTimeListener = function(e) {
 };
 
 editor3d.reInit3dData = function () {
-    // since there is no way to tell what exactly was changed, reset everything
-    // reset stack objects
-    b3d.roomsInStack = {};
-    b3d.stackPosOfRoom = {};
-    b3d.meshConfig = {};
-
-    // delete camera
-    b3d.mainCamera.deactivate();
-    b3d.mainCamera.ref.dispose();
-    b3d.mainCamera = null;
-
-    // reload data
-    b3d.parseData();
+    b3d.reInit3dData();
 
     // set editor camera as active again
     editor3d.camera.activate();
 
     editor3d.suggestReplacingNameTags();
-    // clear all caches to force all drawings to reset during the update
-    b3d.clearCaches(Object.values(b3d.caches));
     // this fixes 3d editor crash when removing rooms right after modifying game data
     bitsy.selectRoom(bitsy.curRoom);
 
