@@ -54,7 +54,9 @@ function PaletteTool(colorPicker,labelIds,nameFieldId) {
 		var rgbColorStr = "rgb(" + rgbColor.r + "," + rgbColor.g + "," + rgbColor.b + ")";
 		var hsvColor = RGBtoHSV( rgbColor );
 		document.getElementById( labelIds[ index ] ).style.background = rgbColorStr;
-		document.getElementById( labelIds[ index ] ).style.color = hsvColor.v < 0.5 ? "white" : "black";
+
+		document.getElementById(labelIds[ index ])
+			.setAttribute("class", hsvColor.v < 0.5 ? "colorPaletteLabelDark" : "colorPaletteLabelLight");
 	}
 
 	// public
@@ -152,10 +154,10 @@ function PaletteTool(colorPicker,labelIds,nameFieldId) {
 	}
 
 	this.DeleteSelected = function() {
-		if ( sortedPaletteIdList().length <= 1 ) {
+		if (sortedPaletteIdList().length <= 1) {
 			alert("You can't delete your only palette!");
 		}
-		else {
+		else if (confirm("Are you sure you want to delete this palette?")) {
 			delete palette[curPaletteId];
 
 			// replace palettes for rooms using the current palette

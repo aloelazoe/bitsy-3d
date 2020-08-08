@@ -28,6 +28,10 @@ var resourceFiles = [
 	"../editor/script/3d/bitsy3d.js",
 ];
 
+var resourceDirectories = [
+  "resources/icons",
+];
+
 var resourcePackage = {};
 
 function getFileName(path) {
@@ -40,6 +44,16 @@ for (var i = 0; i < resourceFiles.length; i++) {
 	var fileName = getFileName(path);
 	var result = fs.readFileSync(path, "utf8");
 	resourcePackage[fileName] = result;
+}
+
+for (var i = 0; i < resourceDirectories.length; i++) {
+	var dir = resourceDirectories[i];
+	var fileNames = fs.readdirSync(dir);
+	for (var j = 0; j < fileNames.length; j++) {
+		var fileName = fileNames[j];
+		var result = fs.readFileSync(dir + "/" + fileName, "utf8");
+		resourcePackage[fileName] = result;
+	}
 }
 
 var resourceJavascriptFile = "var Resources = " + JSON.stringify(resourcePackage, null, 2) + ";";
