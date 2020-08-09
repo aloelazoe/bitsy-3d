@@ -113,7 +113,7 @@
 
 				<input type="checkbox" value="room3dPanel" id="room3dCheck" onclick="togglePanelAnimated(event);" checked/>
 				<label title="show / hide 3d editor window" for="room3dCheck">
-					<i class="material-icons">grid_on</i>
+					<span class="bitsy_icon icon_space_right">scene_3d</span>
 					<span>3d scene</span>
 				</label>
 
@@ -125,7 +125,7 @@
 
 				<input type="checkbox" value="meshPanel" id="meshCheck" onclick="togglePanelAnimated(event);"  checked/>
 				<label title="show / hide mesh window" for="meshCheck">
-					<i class="material-icons">brush</i>
+					<span class="bitsy_icon icon_space_right">settings_3d</span>
 					<span>3d settings</span>
 				</label>
 
@@ -301,11 +301,11 @@
 				<div id="room3dPanel" class="panel">
 					<div class="bar">
 						<button title="minimize 3d editor window" class="light panelBarClose" onclick="hidePanel('room3dPanel');">
-							<i class="material-icons">close</i>
+							<span class="bitsy_icon">close</span>
 						</button>
 
 						<div title="3d editor window" class="panelBarTitle" onmousedown="grabCard(event);">
-							<i class="material-icons">grid_on</i>
+							<span class="bitsy_icon icon_large icon_space_right">scene_3d</span>
 							<span>3d scene</span>
 						</div>
 					</div>
@@ -313,13 +313,13 @@
 					<div style="margin-bottom:2px;">			
 						<input type="checkbox" id="playModeCheck3d" onclick="togglePlayMode(event);" />
 						<label title="play / pause game" for="playModeCheck3d">
-							<i class="material-icons" id="playModeIcon">play_arrow</i>
+							<span id="playModeIcon" class="bitsy_icon">play</span>
 							<span id="playModeText" class="localize play_game">play</span> <!-- TODO LOCALIZE: also stop_game -->
 						</label>
 
 						<input type="checkbox" id="previewCameraInputScene3d" onclick="meshPanel.switchPreviewCamera(event.target.checked);" />
 						<label id="previewCameraLabelScene3d" title="switch between editor and game cameras" for="previewCameraInputScene3d">
-							<i class="material-icons">videocam</i>
+							<span class="bitsy_icon">camera</span>
 						</label>
 					</div>
 
@@ -330,22 +330,22 @@
 
 					<div id="room3dStackControls" class="controlBox">
 						<button title="previous stack" class="color0" onclick="room3dPanel.selectAdjacent(-1);">
-							<i class="navigate_before material-icons"><span>navigate_before</span></i>
+							<span class="bitsy_icon">previous</span>
 						</button>
 						<button title="next stack" class="color0" onclick="room3dPanel.selectAdjacent(1);">
-							<i class="navigate_next material-icons"><span>navigate_next</span></i>
+							<span class="bitsy_icon">next</span>
 						</button>
 						<button title="add new stack" class="color0" onclick="newRoom();">
-							<i class="material-icons">add</i>
+							<span class="bitsy_icon">add</span>
 						</button>
 						<button title="duplicate stack" class="color0" onclick="room3dPanel.duplicate();">
-							<i class="material-icons">content_copy</i>
+							<span class="bitsy_icon">copy</span>
 						</button>
 						<button title="delete stack" class="color0" onclick="room3dPanel.delete();">
-							<i class="material-icons">remove_circle</i>
+							<span class="bitsy_icon">delete</span>
 						</button>
 						<button title="take a screenshot" class="color0" onclick="editor3d.takeScreenshot = true">
-							<i class="material-icons">camera</i>
+							<span class="bitsy_icon">record_snapshot</span>
 						</button>
 						<span id="room3dControlsTip"><b>shift</b>: grid, <b>alt</b>: select, <b>[controlKeyDisplayName]</b>: remove</span>
 					</div>
@@ -354,11 +354,11 @@
 				<div id="meshPanel" class="panel">
 					<div class="bar">
 						<button title="minimize mesh window" class="light panelBarClose" onclick="hidePanel('meshPanel');">
-							<i class="material-icons">close</i>
+							<span class="bitsy_icon">close</span>
 						</button>
 
 						<div title="mesh window" class="panelBarTitle" onmousedown="grabCard(event);">
-							<i class="material-icons">brush</i>
+							<span class="bitsy_icon icon_large icon_space_right">settings_3d</span>
 							<span>3d settings</span>
 						</div>
 					</div>
@@ -366,17 +366,17 @@
 					<form>
 						<input type="radio" name="3d settings tabs" value="mesh" onclick="meshPanel.onTabMesh();" id="settings3dTabMesh" checked>
 						<label title="configure the mesh" for="settings3dTabMesh" class="left">
-							<i class="material-icons">brush</i>
+							<span class="bitsy_icon icon_space_right">cube_3d</span>
 							<span>mesh</span>
 						</label>
 						<input type="radio" name="3d settings tabs" value="camera" onclick="meshPanel.onTabCamera();" id="settings3dTabCamera">
 						<label title="configure the camera" for="settings3dTabCamera" class="middle">
-							<i class="material-icons">videocam</i>
+							<span class="bitsy_icon icon_space_right">camera</span>
 							<span>camera</span>
 						</label>
 						<input type="radio" name="3d settings tabs" value="game" onclick="meshPanel.onTabGame();" id="settings3dTabGame">
 						<label title="game settings" for="settings3dTabGame" class="right">
-							<i class="material-icons">settings</i>
+							<span class="bitsy_icon icon_space_right">settings</span>
 							<span>game</span>
 						</label>
 					</form>
@@ -411,7 +411,7 @@
 							<div id="meshAddChildButton" style="display:none; margin-top:2px; margin-bottom:7px;">
 								<input type="radio" name="children list" value="new" onclick="meshPanel.onAddChildButton(event);" id="addChildButtonInput">
 								<label for="addChildButtonInput" title="add another mesh as a 'child' object which will be positioned relative to this one, its 'parent'">
-									<i class="material-icons">add</i>
+									<span class="bitsy_icon">add</span>
 								</label>
 							</div>
 						</form>
@@ -446,24 +446,24 @@
 							<input type="checkbox" id="transformCheck" onclick="meshPanel.onToggleTransform();" />
 							<label title="translation (offset), rotation and scale settings" for="transformCheck">
 								<span>transform</span>
-								<i id="transformCheckIcon" class="material-icons">expand_less</i>
+								<span id="transformCheckIcon" class="bitsy_icon">arrow_up</span>
 							</label>
 
 							<div id="transform" style="display:none;">
 								<div id="transformTranslation">
-									<i class="material-icons" title="translation (offset)" style="vertical-align:middle">swap_horiz</i>
+									<span class="bitsy_icon" title="translation (offset)" style="vertical-align:middle">translation</span>
 									<input type="text" id="transformTranslationX" title="translation on x axis" size="7" value="0">
 									<input type="text" id="transformTranslationY" title="translation on y axis" size="7" value="0">
 									<input type="text" id="transformTranslationZ" title="translation on z axis" size="7" value="0">
 								</div>
 								<div id="transformRotation">
-									<i class="material-icons" title="rotation" style="vertical-align:middle">rotate_right</i>
+									<span class="bitsy_icon" title="rotation" style="vertical-align:middle">rotation</span>
 									<input type="text" id="transformRotationX" title="rotation in degrees around x axis" size="7" value="0">
 									<input type="text" id="transformRotationY" title="rotation in degrees around y axis" size="7" value="0">
 									<input type="text" id="transformRotationZ" title="rotation in degrees around z axis" size="7" value="0">
 								</div>
 								<div id="transformScale">
-									<i class="material-icons" title="scale" style="vertical-align:middle">zoom_out_map</i>
+									<span class="bitsy_icon" title="scale" style="vertical-align:middle">expand_more</span>
 									<input type="text" id="transformScaleX" title="scale on x axis" size="7" value="1">
 									<input type="text" id="transformScaleY" title="scale on y axis" size="7" value="1">
 									<input type="text" id="transformScaleZ" title="scale on z axis" size="7" value="1">
@@ -476,7 +476,7 @@
 						<div id="previewCameraDiv" style="margin-bottom:2px;">			
 							<input type="checkbox" id="previewCameraInput" onclick="meshPanel.switchPreviewCamera(event.target.checked);" />
 							<label title="switch between editor and game cameras" for="previewCameraInput">
-								<i id="previewCameraIcon" class="material-icons">visibility</i>
+								<span id="previewCameraIcon" class="bitsy_icon">visibility</span>
 								<span id="previewCameraSpan">preview game camera</span>
 							</label>
 						</div>
@@ -489,7 +489,7 @@
 						<input type="checkbox" id="settings3dCameraAdvancedCheck" onclick="meshPanel.toggleAdvancedCameraSettings(event);">
 						<label title="show / hide advanced camera settings" for="settings3dCameraAdvancedCheck">
 							<span>advanced camera settings</span>
-							<i id="cameraAdvancedSettingsCheckIcon" class="material-icons">expand_less</i>
+							<span id="cameraAdvancedSettingsCheckIcon" class="bitsy_icon">arrow_up</span>
 						</label>
 						<br>
 						<div id="settings3dCameraAdvanced" style="display:none;">
@@ -515,13 +515,13 @@
 								<br/>
 								<input type="radio" name="engineSize" value="auto" onclick="meshPanel.onChangeEngineSize(event);" id="engineSizeOptionAuto" checked>
 								<label title="use display resolution" for="engineSizeOptionAuto" class="left">
-									<i class="material-icons">crop_free</i>
+									<span class="bitsy_icon">pagesize_full</span>
 									<span>auto</span>
 								</label>
 
 								<input type="radio" name="engineSize" value="fixed" onclick="meshPanel.onChangeEngineSize(event);" id="engineSizeOptionFixed">
 								<label title="set rendering resolution manually" for="engineSizeOptionFixed" class="right">
-									<i class="material-icons">crop</i>
+									<span class="bitsy_icon">pagesize_fixed</span>
 									<span>fixed</span>
 								</label>
 
@@ -542,13 +542,13 @@
 								<br/>
 								<input type="radio" name="canvasSize" value="auto" onclick="meshPanel.onChangeCanvasSize(event);" id="canvasSizeOptionAuto" checked>
 								<label title="fit the screen. will maintain aspect ratio when using fixed rendering resolution" for="canvasSizeOptionAuto" class="left">
-									<i class="material-icons">crop_free</i>
+									<span class="bitsy_icon">pagesize_full</span>
 									<span>auto</span>
 								</label>
 
 								<input type="radio" name="canvasSize" value="fixed" onclick="meshPanel.onChangeCanvasSize(event);" id="canvasSizeOptionFixed">
 								<label title="set canvas size manually" for="canvasSizeOptionFixed" class="right">
-									<i class="material-icons">crop</i>
+									<span class="bitsy_icon">pagesize_fixed</span>
 									<span>fixed</span>
 								</label>
 

@@ -1236,7 +1236,7 @@ var meshPanel = {
         deleteButton.setAttribute('class', 'color0');
         deleteButton.setAttribute('style', 'margin-top: 2px; margin-left: 2px;');
         Object.assign(deleteButton, {value: childIndex, title: 'delete child mesh', onclick: meshPanel.deleteChild});
-        deleteButton.innerHTML = '<i class="material-icons">remove_circle</i>';
+        deleteButton.appendChild(bitsy.iconUtils.CreateIcon('delete', 0));
         divEl.appendChild(deleteButton);
     },
 
@@ -1408,10 +1408,10 @@ var meshPanel = {
     onToggleTransform: function() {
         if ( document.getElementById('transformCheck').checked ) {
             document.getElementById('transform').setAttribute('style','display:block;');
-            document.getElementById('transformCheckIcon').innerHTML = 'expand_more';
+            bitsy.iconUtils.LoadIcon(document.getElementById('transformCheckIcon'), 'arrow_down', 0);
         } else {
             document.getElementById('transform').setAttribute('style','display:none;');
-            document.getElementById('transformCheckIcon').innerHTML = 'expand_less';
+            bitsy.iconUtils.LoadIcon(document.getElementById('transformCheckIcon'), 'arrow_up', 0);
         }
     },
 
@@ -1626,10 +1626,10 @@ var meshPanel = {
     toggleAdvancedCameraSettings: function (event) {
         if (document.getElementById('settings3dCameraAdvancedCheck').checked) {
             document.getElementById('settings3dCameraAdvanced').style.display = 'block';
-            document.getElementById("cameraAdvancedSettingsCheckIcon").innerHTML = "expand_more";
+            bitsy.iconUtils.LoadIcon(document.getElementById('cameraAdvancedSettingsCheckIcon'), 'arrow_down', 0);
         } else {
             document.getElementById('settings3dCameraAdvanced').style.display = 'none';
-            document.getElementById("cameraAdvancedSettingsCheckIcon").innerHTML = "expand_less";
+            bitsy.iconUtils.LoadIcon(document.getElementById('cameraAdvancedSettingsCheckIcon'), 'arrow_up', 0);
         }
     },
 
@@ -1653,10 +1653,10 @@ var meshPanel = {
         document.getElementById('previewCameraInput').checked = checked;
         document.getElementById('previewCameraInputScene3d').checked = checked;
         if (checked) {
-            document.getElementById('previewCameraIcon').innerText = 'visibility_off';
+            bitsy.iconUtils.LoadIcon(document.getElementById('previewCameraIcon'), 'visibility_off', 0);
             document.getElementById('previewCameraSpan').innerText = 'switch back to editor camera';
         } else {
-            document.getElementById('previewCameraIcon').innerText = 'visibility';
+            bitsy.iconUtils.LoadIcon(document.getElementById('previewCameraIcon'), 'visibility', 0);
             document.getElementById('previewCameraSpan').innerText = 'preview game camera';
         }
     },
