@@ -1466,7 +1466,9 @@ b3d.update = function () {
         });
     }
     // copy avatar's position into avatarNode
-    b3d.avatarNode.position = b3d.avatarRef.position;
+    if (b3d.avatarRef && b3d.avatarRef.position) {
+        b3d.avatarNode.position = b3d.avatarRef.position;
+    }
 
     // item changes
     // delete irrelevant b3d.items
