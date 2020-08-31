@@ -3056,6 +3056,7 @@ function addNewFrameToDrawing(drwId) {
 	var imageSource = renderer.GetImageSource(drwId);
 	var firstFrame = imageSource[0];
 	var newFrame = [];
+	var tilesize = firstFrame.length;
 	for (var y = 0; y < tilesize; y++) {
 		newFrame.push([]);
 		for (var x = 0; x < tilesize; x++) {

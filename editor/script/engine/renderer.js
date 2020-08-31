@@ -82,6 +82,8 @@ function renderImage(drawing, paletteId) {
 
 function imageDataFromImageSource(imageSource, pal, col) {
 	//console.log(imageSource);
+    var tilesize = imageSource.length;
+    var scale = Math.ceil(4 / (tilesize / 8));
 
 	var img = context.createImageData(tilesize*scale,tilesize*scale);
 
