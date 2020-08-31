@@ -1242,53 +1242,47 @@ b3d.getCache = function (cacheName, make) {
     };
 };
 
-b3d._tempTransparencyCanvas = document.createElement('canvas');
 b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparency, alpha) {
-    var frameCanvases = [];
     var numFrames = drawing.animation.isAnimated? drawing.animation.frameCount: 1;
+    var imageSource = bitsy.renderer.GetImageSource(drawing.drw);
+    var frameWidth = imageSource[0][0].length;
+    var frameHeight = imageSource[0].length;
 
-    for (var curFrame = 0; curFrame < numFrames; curFrame++) {
-        frameCanvases[curFrame] = bitsy.renderer.GetImage(drawing, pal, curFrame);
-    }
-    var frameWidth = frameCanvases[0].width;
-
-    // var canvas = bitsy.renderer.GetImage(drawing, pal);
+    // get the colors
+    var bg = bitsy.palette[pal].colors[0].slice();
+    bg[3] = transparency? 0: 255;
+    var fg = bitsy.palette[pal].colors[drawing.col].slice();
+    fg[3] = Math.round(alpha * 255);
 
     var tex = new BABYLON.DynamicTexture(drawing.drw, {
         width: frameWidth * numFrames,
-        height: frameCanvases[0].height,
+        height: frameHeight,
     }, b3d.scene, false, BABYLON.Texture.NEAREST_NEAREST_MIPNEAREST);
 
     tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+    tex.uScale = 1 / numFrames;
+    if (transparency || alpha < 1) tex.hasAlpha = true;
 
-    frameCanvases.forEach(function (canvas, curFrame) {
-        if (transparency || alpha < 1) {
-            // to create texture with transparency, swap the original bitsy drawing
-            // with the copy that will have its background-colored pixels set to be transparent
-            // original drawing should be preserved to be able to switch to non-transparent
-            // version and to avoid bugs in the editor
-            var copyCtx = b3d._tempTransparencyCanvas.getContext('2d');
-            copyCtx.drawImage(canvas, 0, 0);
-            tex.hasAlpha = true;
-            var data = copyCtx.getImageData(0, 0, canvas.width, canvas.height);
-            var bg = bitsy.getPal(pal)[0];
-            for (let i = 0; i < data.data.length; i += 4) {
-                var r = data.data[i];
-                var g = data.data[i + 1];
-                var b = data.data[i + 2];
-                if (transparency && r === bg[0] && g === bg[1] && b === bg[2]) {
-                    data.data[i + 3] = 0;
-                } else if (alpha < 1) {
-                    data.data[i + 3] = Math.round(alpha * 255);
+    var ctx = tex.getContext();
+    var imageData = ctx.getImageData(0, 0, frameWidth * numFrames, frameHeight);
+    for (var frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        var curFrame = imageSource[frameIndex];
+        for (var y = 0; y < curFrame.length; y++) {
+            for (var x = 0; x < curFrame[y].length; x++) {
+                // position of the red component of the pixel at a given coordinate
+                var i = y * (frameWidth * numFrames * 4) + ((frameWidth * frameIndex) + x) * 4;
+                // choose background or foreground color               
+                var col = curFrame[y][x] === 0? bg: fg;
+                // iterate through red, green, blue and alpha components
+                // and put them into image data
+                for (var c = 0; c < col.length; c++) {
+                    imageData.data[i + c] = col[c];
                 }
             }
-            copyCtx.putImageData(data, 0, 0);
-            var canvas = b3d._tempTransparencyCanvas;
         }
-        var texCtx = tex.getContext();
-        texCtx.drawImage(canvas, curFrame * frameWidth, 0);
-    });
-    tex.uScale = 1/numFrames;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
     tex.update();
     return tex;
 });
