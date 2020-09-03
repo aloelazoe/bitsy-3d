@@ -102,9 +102,16 @@ function sortedRoomIdList() {
 	return sortedBase36IdList( room );
 }
 
+var specialDialogTags = [];
+specialDialogTags.push('DRAWINGSIZE');
+
 function sortedDialogIdList() {
 	var keyList = Object.keys(dialog);
 	keyList.splice(keyList.indexOf("title"), 1);
+	// filter out dialog id for special dialog entries like DATA3D and DRAWINGSIZE
+	specialDialogTags.forEach(function (tag) {
+		keyList.splice(keyList.indexOf(tag), 1);
+	});
 	var keyObj = {};
 	for (var i = 0; i < keyList.length; i++) {
 		keyObj[keyList[i]] = {};
@@ -246,23 +253,84 @@ function makeItem(id,imageData) { // NOTE : same as tile right now? make more li
 	makeDrawing(drwId,imageData);
 }
 
+/* CUSTOMIZABLE DRAWING SIZE */
+function validateNewDrawingSize(newSize) {
+	newSize = parseInt(newSize);
+	if (isNaN(newSize) || newSize <= 0) {
+		console.warn('drawing size ' + newSize + ' is invalid! resetting to 8')
+		newSize = 8;
+	}
+	return newSize;
+}
+
+function setNewDrawingSize (newSize) {
+	if (!dialog['DRAWINGSIZE']) {
+		dialog['DRAWINGSIZE'] = {
+	        src: null,
+	        name: null,
+	    };
+	}
+	dialog['DRAWINGSIZE'].src = '' + newSize;
+	refreshGameData();
+}
+
+function getNewDrawingSize () {
+	return validateNewDrawingSize(dialog['DRAWINGSIZE'] && dialog['DRAWINGSIZE'].src);
+}
+
 function makeDrawing(id,imageData) {
+	var newSize = getNewDrawingSize();
 	if (!imageData) {
-		imageData = [[
-			[0,0,0,0,0,0,0,0],
-			[0,0,0,0,0,0,0,0],
-			[0,0,0,0,0,0,0,0],
-			[0,0,0,0,0,0,0,0],
-			[0,0,0,0,0,0,0,0],
-			[0,0,0,0,0,0,0,0],
-			[0,0,0,0,0,0,0,0],
-			[0,0,0,0,0,0,0,0]
-		]];
+		// initialize with nested array for the first frame
+		imageData = [[]];
+		for (var y = 0; y < newSize; y++) {
+			imageData[0][y] = [];
+				for (var x = 0; x < newSize; x++) {
+					imageData[0][y][x] = 0;
+				}
+		}
 	}
 	// TODO RENDERER : stop using global renderer
 	renderer.SetImageSource(id,imageData);
 	// TODO RENDERER : re-render images?
 }
+
+/* DRAWING SIZE UI */
+function onChangeDrawingSize(event) {
+	var newSize;
+	if (event.target.value === 'custom') {
+		newSize = validateNewDrawingSize(document.getElementById('newDrawingSizeCustomInput').value);
+		document.getElementById('newDrawingSizeCustomSpan').style.display = 'inline-block';
+	} else {
+		newSize = validateNewDrawingSize(event.target.value);
+		if (event.target.type === 'radio') {
+			// if we used a preset attached to a radio button, hide custom size input
+			document.getElementById('newDrawingSizeCustomSpan').style.display = 'none';
+		} else {
+			// if we used an input element for custom size, make sure to overwrite invalid value
+			event.target.value = newSize;
+		}
+	}
+	setNewDrawingSize(newSize);
+	console.log('changed new drawing size to ' + newSize);
+}
+
+function updateDrawingSizeUi() {
+	var newSize = getNewDrawingSize();
+	if ([8, 16].indexOf(newSize) !== -1) {
+		document.getElementById('newDrawingSize' + newSize).checked = true;
+		document.getElementById('newDrawingSizeCustomSpan').style.display = 'none';
+	} else {
+		document.getElementById("newDrawingSizeCustom").checked = true;
+		document.getElementById('newDrawingSizeCustomSpan').style.display = 'inline-block';
+		document.getElementById('newDrawingSizeCustomInput').value = newSize;
+	}
+}
+
+// update drawing size ui when loading new game data or when game data is changed
+events.Listen("game_data_change", function() {
+    updateDrawingSizeUi();
+});
 
 /* EVENTS */
 function on_change_title(e) {
@@ -3007,6 +3075,7 @@ function addNewFrameToDrawing(drwId) {
 	var imageSource = renderer.GetImageSource(drwId);
 	var firstFrame = imageSource[0];
 	var newFrame = [];
+	var tilesize = firstFrame.length;
 	for (var y = 0; y < tilesize; y++) {
 		newFrame.push([]);
 		for (var x = 0; x < tilesize; x++) {

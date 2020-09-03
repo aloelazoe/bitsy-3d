@@ -1150,6 +1150,31 @@
 								</div>
 							</form>
 						</div>
+						<div class="controlBox" title="the size that new drawings will have by default">
+							<form>
+								<span>default size for new drawings:</span>
+								<br/>
+								<input type="radio" name="new drawing size" value="8" onclick="onChangeDrawingSize(event);" id="newDrawingSize8" checked>
+								<label for="newDrawingSize8" class="left">
+									<span>8x8 - classic</span>
+								</label>
+
+								<input type="radio" name="new drawing size" value="16" onclick="onChangeDrawingSize(event);" id="newDrawingSize16">
+								<label for="newDrawingSize16" class="middle">
+									<span>16x16 - hd</span>
+								</label>
+
+								<input type="radio" name="new drawing size" value="custom" onclick="onChangeDrawingSize(event);" id="newDrawingSizeCustom">
+								<label for="newDrawingSizeCustom" class="right">
+									<span>custom</span>
+								</label>
+							</form>
+							<div style="margin-top:5px;">
+								<span class="controlBox" id="newDrawingSizeCustomSpan" style="display:none;">
+									<input type="number" min="1" value="8" style="width:60px;" onchange="onChangeDrawingSize(event);" id="newDrawingSizeCustomInput">
+								</span>
+							</div>
+						</div>
 						<div class="controlBox">
 							<span class="localize font_label">font</span>:
 							<select id="fontSelect" onchange="on_change_font(event);">

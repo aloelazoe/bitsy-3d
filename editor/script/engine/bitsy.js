@@ -1831,35 +1831,42 @@ function parseDrawing(lines, i) {
 }
 
 function parseDrawingCore(lines, i, drwId) {
-	var frameList = []; //init list of frames
-	frameList.push( [] ); //init first frame
-	var frameIndex = 0;
-	var y = 0;
-	while ( y < tilesize ) {
-		var l = lines[i+y];
-		var row = [];
-		for (x = 0; x < tilesize; x++) {
-			row.push( parseInt( l.charAt(x) ) );
-		}
-		frameList[frameIndex].push( row );
-		y++;
+    var frameIndex = 0;
+    var frameListStrings = [];
+    frameListStrings.push([]);
 
-		if (y === tilesize) {
-			i = i + y;
-			if ( lines[i] != undefined && lines[i].charAt(0) === ">" ) {
-				// start next frame!
-				frameList.push( [] );
-				frameIndex++;
-				//start the count over again for the next frame
-				i++;
-				y = 0;
-			}
-		}
-	}
+    while (!isNaN(parseInt(lines[i].charAt(0))) || lines[i].charAt(0) === ">") {
+        if ( lines[i].charAt(0) === ">") {
+            frameListStrings.push([]);
+            frameIndex++;
+        } else {
+            frameListStrings[frameIndex].push(lines[i]);
+        }
+        i++;
+    }
 
-	renderer.SetImageSource(drwId, frameList);
+    // interpret drawing size as a number of lines in the first frame
+    var drawingSize = frameListStrings[0].length;
 
-	return i;
+    var framesParsed = [];
+
+    // parse drawing data
+    frameListStrings.forEach(function (frame, frameIndex) {
+        framesParsed[frameIndex] = [];
+        for (y = 0; y < drawingSize; y++) {
+            var line = frame[y] || '';
+            framesParsed[frameIndex][y] = [];
+            for (x = 0; x < drawingSize; x++) {
+                var parsedPixel = parseInt(line.charAt(x));
+                parsedPixel = isNaN(parsedPixel)? 0: parsedPixel;
+                framesParsed[frameIndex][y].push(parsedPixel);
+            }
+        }
+    });
+
+    renderer.SetImageSource(drwId, framesParsed);
+
+    return i;
 }
 
 function parseScript(lines, i, backCompatPrefix, compatibilityFlags) {

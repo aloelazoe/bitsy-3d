@@ -110,7 +110,9 @@ function PaintTool(canvas, roomTool) {
 	// TODO : variables
 	var self = this; // feels a bit hacky
 
-	var paint_scale = 32;
+	var defaultTilesize = this.curTilesize = 8;
+	var defaultPaintScale = this.curPaintScale = 32;
+
 	var curPaintBrush = 0;
 	var isPainting = false;
 	this.isCurDrawingAnimated = false; // TODO eventually this can be internal
@@ -124,8 +126,8 @@ function PaintTool(canvas, roomTool) {
 	this.explorer = null; // TODO: hacky way to tie this to a paint explorer -- should use events instead
 
 	//paint canvas & context
-	canvas.width = tilesize * paint_scale;
-	canvas.height = tilesize * paint_scale;
+	canvas.width = defaultTilesize * defaultPaintScale;
+	canvas.height = defaultTilesize * defaultPaintScale;
 	var ctx = canvas.getContext("2d");
 
 	// paint events
@@ -136,6 +138,12 @@ function PaintTool(canvas, roomTool) {
 	canvas.addEventListener("touchstart", onTouchStart);
 	canvas.addEventListener("touchmove", onTouchMove);
 	canvas.addEventListener("touchend", onTouchEnd);
+
+	this.updateCurTilesize = function () {
+		var newTilesize = self.drawing.getFrameData(0).length;
+		self.curTilesize = newTilesize;
+		self.curPaintScale = defaultPaintScale / (newTilesize / defaultTilesize);
+	};
 
 	// TODO : 
 	function onMouseDown(e) {
@@ -150,7 +158,7 @@ function PaintTool(canvas, roomTool) {
 
 		var off = getOffset(e);
 
-		off = mobileOffsetCorrection(off,e,(tilesize));
+		off = mobileOffsetCorrection(off,e,(self.curTilesize));
 
 		var x = Math.floor(off.x);
 		var y = Math.floor(off.y);
@@ -174,7 +182,7 @@ function PaintTool(canvas, roomTool) {
 		if (isPainting) {
 			var off = getOffset(e);
 
-			off = mobileOffsetCorrection(off,e,(tilesize));
+			off = mobileOffsetCorrection(off,e,(self.curTilesize));
 
 			var x = Math.floor(off.x);// / paint_scale);
 			var y = Math.floor(off.y);// / paint_scale);
@@ -231,17 +239,17 @@ function PaintTool(canvas, roomTool) {
 		}
 
 		//draw pixels
-		for (var x = 0; x < 8; x++) {
-			for (var y = 0; y < 8; y++) {
+		for (var x = 0; x < self.curTilesize; x++) {
+			for (var y = 0; y < self.curTilesize; y++) {
 				// draw alternate frame
 				if (self.isCurDrawingAnimated && curDrawingAltFrameData()[y][x] === 1) {
 					ctx.globalAlpha = 0.3;
-					ctx.fillRect(x*paint_scale,y*paint_scale,1*paint_scale,1*paint_scale);
+					ctx.fillRect(x*self.curPaintScale,y*self.curPaintScale,1*self.curPaintScale,1*self.curPaintScale);
 					ctx.globalAlpha = 1;
 				}
 				// draw current frame
 				if (curDrawingData()[y][x] === 1) {
-					ctx.fillRect(x*paint_scale,y*paint_scale,1*paint_scale,1*paint_scale);
+					ctx.fillRect(x*self.curPaintScale,y*self.curPaintScale,1*self.curPaintScale,1*self.curPaintScale);
 				}
 			}
 		}
@@ -250,11 +258,11 @@ function PaintTool(canvas, roomTool) {
 		if (self.drawPaintGrid) {
 			ctx.fillStyle = getContrastingColor();
 
-			for (var x = 1; x < tilesize; x++) {
-				ctx.fillRect(x*paint_scale,0*paint_scale,1,tilesize*paint_scale);
+			for (var x = 1; x < self.curTilesize; x++) {
+				ctx.fillRect(x*self.curPaintScale,0*self.curPaintScale,1,self.curTilesize*self.curPaintScale);
 			}
-			for (var y = 1; y < tilesize; y++) {
-				ctx.fillRect(0*paint_scale,y*paint_scale,tilesize*paint_scale,1);
+			for (var y = 1; y < self.curTilesize; y++) {
+				ctx.fillRect(0*self.curPaintScale,y*self.curPaintScale,self.curTilesize*self.curPaintScale,1);
 			}
 		}
 	}
@@ -281,6 +289,7 @@ function PaintTool(canvas, roomTool) {
 	this.onReloadItem = null;
 	this.reloadDrawing = function() {
 		self.drawing.reloadImageSource();
+		self.updateCurTilesize();
 
 		if ( self.drawing.type === TileType.Tile) {
 			if(self.onReloadTile) {
