@@ -1250,7 +1250,7 @@ b3d.getTextureFromCache = b3d.getCache('tex', function(drawing, pal, transparenc
 
     // get the colors
     var bg = bitsy.palette[pal].colors[0].slice();
-    bg[3] = transparency? 0: 255;
+    bg[3] = transparency? 0: Math.round(alpha * 255);
     var fg = bitsy.palette[pal].colors[drawing.col].slice();
     fg[3] = Math.round(alpha * 255);
 
