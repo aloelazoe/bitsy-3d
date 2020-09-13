@@ -13,6 +13,8 @@ var editor3d = {
         Gray: new BABYLON.Color3(1, 1, 1),
     },
 
+    axes: null,
+
     // debug. set this when clicking on the mesh in select mode
     curSelectedMesh: null,
 
@@ -228,6 +230,130 @@ editor3d.init = function() {
     editor3d.paintGrid.lines.isPickable = false;
     editor3d.paintGrid.lines.isVisible = false;
     editor3d.paintGrid.lines.setParent(editor3d.paintGrid.transformNode);
+
+    // add 3d axes gizmo
+    editor3d.axisNamesSource = {
+        'x': [
+            [0,1,0,0,0,1,0],
+            [0,1,0,0,0,1,0],
+            [0,0,1,0,1,0,0],
+            [0,0,0,1,0,0,0],
+            [0,0,1,0,1,0,0],
+            [0,1,0,0,0,1,0],
+            [0,1,0,0,0,1,0],
+        ],
+        'y': [
+            [0,1,0,0,0,1,0],
+            [0,1,0,0,0,1,0],
+            [0,1,0,0,0,1,0],
+            [0,0,1,0,1,0,0],
+            [0,0,0,1,0,0,0],
+            [0,0,0,1,0,0,0],
+            [0,0,0,1,0,0,0],
+        ],
+        'z': [
+            [0,1,1,1,1,1,0],
+            [0,0,0,0,0,1,0],
+            [0,0,0,0,1,0,0],
+            [0,0,0,1,0,0,0],
+            [0,0,1,0,0,0,0],
+            [0,1,0,0,0,0,0],
+            [0,1,1,1,1,1,0],
+        ],
+    }
+
+    editor3d.axes = new BABYLON.Mesh('axesBase', b3d.scene);
+    editor3d.axisNames = {};
+
+    ['x', 'y', 'z'].forEach(function (axisName, axisIndex) {
+        var bg = [0,0,0,0];
+        var fg = [100,100,100,255];
+        fg[axisIndex] = 255;
+
+        var barHeight = 3;
+        var barDiameter = 0.5;
+        var coneHeight = 1.5;
+        var coneDiameter = 1.5;
+        var nameSize = 2;
+
+        var mat = new BABYLON.StandardMaterial('axisMaterial' + axisName, b3d.scene);
+        mat.ambientColor = new BABYLON.Color3.FromArray(fg.map(c => c/255 * 0.8));
+        mat.maxSimultaneousLights = 0;
+
+        var bar = BABYLON.MeshBuilder.CreateCylinder('axisBar' + axisName, {
+            diameterTop: barDiameter,
+            tessellation: 8,
+            height: barHeight,
+            diameterBottom: barDiameter,
+        }, b3d.scene);
+        bar.material = mat;
+        
+        var cone = BABYLON.MeshBuilder.CreateCylinder('axisCone' + axisName, {
+            diameterTop: 0,
+            tessellation: 8,
+            height: coneHeight,
+            diameterBottom: coneDiameter,
+        }, b3d.scene);
+        cone.material = mat;
+        cone.position.y = (barHeight / 2) + (coneHeight / 2);
+        cone.setParent(bar);
+        
+        var name = editor3d.axisNames[axisName] = BABYLON.MeshBuilder.CreatePlane('axisName' + axisName, {
+            width: nameSize,
+            height: nameSize,
+        }, b3d.scene);
+        name.billboardMode = 7;
+        name.material = new BABYLON.StandardMaterial('axisNameMaterial' + axisName, b3d.scene);
+        name.material.ambientColor = new BABYLON.Color3(1, 1, 1);
+        name.material.maxSimultaneousLights = 0;
+
+        var imageSource = editor3d.axisNamesSource[axisName];
+        var sourceWidth = imageSource[0].length;
+        var sourceHeight = imageSource.length;
+        var tex = new BABYLON.DynamicTexture('axisNameTexture' + axisName, {
+            width: sourceWidth,
+            height: sourceHeight,
+        }, b3d.scene, false, BABYLON.Texture.NEAREST_NEAREST_MIPNEAREST);
+
+        tex.wrapU = tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+        tex.hasAlpha = true;
+
+        var ctx = tex.getContext();
+        var imageData = ctx.getImageData(0, 0, sourceWidth, sourceHeight);
+        for (var y = 0; y < imageSource.length; y++) {
+            for (var x = 0; x < imageSource[y].length; x++) {
+                // position of the red component of the pixel at a given coordinate
+                var i = y * (sourceWidth * 4) + x * 4;
+                // choose background or foreground color               
+                var col = imageSource[y][x] === 0? bg: fg;
+                // iterate through red, green, blue and alpha components
+                // and put them into image data
+                for (var c = 0; c < col.length; c++) {
+                    imageData.data[i + c] = col[c];
+                }
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        tex.update();
+
+        name.material.diffuseTexture = tex;
+
+        if (axisName === 'x') bar.rotation.z = -Math.PI / 2;
+        if (axisName === 'z') bar.rotation.x = Math.PI / 2;
+        bar.position[axisName] = (barHeight / 2);
+        name.position[axisName] = barHeight + coneHeight + (nameSize / 2);
+
+        // put axis name meshes in the middle of the bitsy room for easier testing
+        name.position.x += 7.5;
+        name.position.z += 7.5;
+
+        bar.setParent(editor3d.axes);
+    });
+    
+    // put them in the middle of the bitsy room for easier testing
+    editor3d.axes.position.x = 7.5;
+    editor3d.axes.position.z = 7.5;
 
     // set the rendering loop function
     b3d.engine.runRenderLoop(editor3d.update);
