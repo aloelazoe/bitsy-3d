@@ -589,7 +589,7 @@ editor3d.init = function() {
     });
 
     bitsy.events.Listen("game_data_change", function() {
-        editor3d.reInit3dData();
+        editor3d.onReload3dData();
     });
 
     // patch refreshGameData function to include 3d data
@@ -599,7 +599,7 @@ editor3d.init = function() {
 
     b3d.patch(bitsy, 'resetGameData', function () {
         delete bitsy.dialog['DATA3D'];
-        editor3d.reInit3dData();
+        editor3d.onReload3dData();
     });
 
     var tempDeletedRoom;
@@ -657,8 +657,7 @@ editor3d.init = function() {
     // patch functions that are called when switching play mode on and off
     b3d.patch(bitsy, 'on_play_mode', null, function () {
         b3d.scene.fogEnabled = true;
-        b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
-        editor3d.reInit3dData();
+        editor3d.onReload3dData();
         b3d.mainCamera.activate();
         document.getElementById('playModeWarning').style.display = 'block';
         document.getElementById('previewCameraDiv').style.display = 'none';
@@ -667,10 +666,8 @@ editor3d.init = function() {
 
     b3d.patch(bitsy, 'on_edit_mode', null, function () {
         b3d.scene.fogEnabled = false;
-        b3d.clearCaches([b3d.caches.mesh, b3d.caches.mat]);
-        editor3d.reInit3dData();
+        editor3d.onReload3dData();
         meshPanel.switchPreviewCamera(document.getElementById('previewCameraInput').checked);
-        if (editor3d.axesGizmo.isOn) editor3d.axesGizmo.show();
         document.getElementById('playModeWarning').style.display = 'none';
         document.getElementById('previewCameraDiv').style.display = 'block';
         document.getElementById('previewCameraLabelScene3d').style.display = 'inline';
@@ -740,11 +737,12 @@ editor3d.updateTextureOneTimeListener = function(e) {
     document.removeEventListener('mouseup', editor3d.updateTextureOneTimeListener);
 };
 
-editor3d.reInit3dData = function () {
+editor3d.onReload3dData = function () {
     b3d.reInit3dData();
 
     // set editor camera as active again
     editor3d.camera.activate();
+    if (editor3d.axesGizmo.isOn) editor3d.axesGizmo.show();
 
     editor3d.suggestReplacingNameTags();
     // this fixes 3d editor crash when removing rooms right after modifying game data
