@@ -321,6 +321,11 @@
 						<label id="previewCameraLabelScene3d" title="switch between editor and game cameras" for="previewCameraInputScene3d">
 							<span class="bitsy_icon">camera</span>
 						</label>
+
+						<input type="checkbox" id="axesGizmoCheck" onclick="room3dPanel.switchAxesGizmo(event);" checked/>
+						<label title="switch 3d axes gizmo on and off" for="axesGizmoCheck" style="padding-left: 7px; padding-bottom: 7px; padding-top: 6px; float: right; margin-right: 0px;">
+							<span class="bitsy_icon icon_space_right">settings_3d</span>
+						</label>
 					</div>
 
 					<div id="gameContainer" style="position: relative;">
@@ -358,7 +363,7 @@
 						</button>
 
 						<div title="mesh window" class="panelBarTitle" onmousedown="grabCard(event);">
-							<span class="bitsy_icon icon_large icon_space_right">settings_3d</span>
+							<span class="bitsy_icon icon_large icon_space_right">settings</span>
 							<span>3d settings</span>
 						</div>
 					</div>

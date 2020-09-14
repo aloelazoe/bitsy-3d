@@ -423,7 +423,7 @@ document.addEventListener('DOMContentLoaded', function() {
             b3d.rawDirection = bitsy.curPlayerDirection;
 
             var rotatedDirection = bitsy.curPlayerDirection;
-            var ray = b3d.scene.activeCamera.getForwardRay().direction;
+            var ray = b3d.curActiveCamera.ref.getForwardRay().direction;
             var ray2 = new BABYLON.Vector2(ray.x, ray.z);
             ray2.normalize();
             var a = (Math.atan2(ray2.y, ray2.x) / Math.PI + 1) * 2 + 0.5;
@@ -884,7 +884,7 @@ b3d.createCamera = function (camData) {
             set: function (a) {
                 traits[k] = a;
                 // if camera is currently active, invoke trait effect immediately
-                if (b3d.scene.activeCamera === this.ref) {
+                if (b3d.curActiveCamera === this) {
                     b3d.cameraDataModel.traitEffects[k].call(this, a);
                 }
             },
@@ -907,6 +907,7 @@ b3d.createCamera = function (camData) {
             }
 
             b3d.curActiveCamera = this;
+            b3d.scene.activeCameras = [];
             b3d.scene.activeCamera = this.ref;
 
             // enable trait effects
@@ -1548,9 +1549,9 @@ b3d.render = function () {
     // clear scene when rendering title/endings
     // using a FOV hack here instead of the engine's clear function
     // in order to ensure post-processing isn't overridden
-    var fov = b3d.scene.activeCamera.fov;
+    var fov = b3d.curActiveCamera.ref.fov;
     if ((!isPlayerEmbeddedInEditor || isPlayMode) && (bitsy.isNarrating || bitsy.isEnding)) {
-        b3d.scene.activeCamera.fov = 0;
+        b3d.curActiveCamera.ref.fov = 0;
     }
     b3d.scene.render();
 
@@ -1561,7 +1562,7 @@ b3d.render = function () {
         });
         b3d.didUpdateAnimations = false;
     };
-    b3d.scene.activeCamera.fov = fov;
+    b3d.curActiveCamera.ref.fov = fov;
 };
 
 b3d.updateObject = function (oldObject, drawing, roomId, x, y) {
@@ -1591,7 +1592,7 @@ b3d.updateObject = function (oldObject, drawing, roomId, x, y) {
 };
 
 b3d.isObjectHidden = function (config) {
-    return config.hidden && (bitsy.EditMode === undefined || b3d.scene.activeCamera === b3d.mainCamera.ref);
+    return config.hidden && (bitsy.EditMode === undefined || b3d.curActiveCamera === b3d.mainCamera);
 };
 
 b3d.isRoomVisible = function (roomId) {
