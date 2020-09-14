@@ -217,6 +217,7 @@ editor3d.axesGizmo.init = function () {
     bgMesh.material.maxSimultaneousLights = 0;
     bgMesh.layerMask = editor3d.axesGizmo.layerMask;
     bgMesh.position.z = 5;
+    bgMesh.isPickable = false;
     bgMesh.setParent(editor3d.axesGizmo.camera);
 
     var texSize = 128;
@@ -288,6 +289,7 @@ editor3d.axesGizmo.init = function () {
         }, b3d.scene);
         bar.material = mat;
         bar.layerMask = editor3d.axesGizmo.layerMask;
+        bar.isPickable = false;
         
         var cone = BABYLON.MeshBuilder.CreateCylinder('axisCone' + axisName, {
             diameterTop: 0,
@@ -299,6 +301,7 @@ editor3d.axesGizmo.init = function () {
         cone.position.y = (barHeight / 2) + (coneHeight / 2);
         cone.setParent(bar);
         cone.layerMask = editor3d.axesGizmo.layerMask;
+        cone.isPickable = false;
         
         var name = editor3d.axesGizmo.labelMeshes[axisName] = BABYLON.MeshBuilder.CreatePlane('axisName' + axisName, {
             width: nameSize,
@@ -309,6 +312,7 @@ editor3d.axesGizmo.init = function () {
         name.material.ambientColor = new BABYLON.Color3(1, 1, 1);
         name.material.maxSimultaneousLights = 0;
         name.layerMask = editor3d.axesGizmo.layerMask;
+        name.isPickable = false;
 
         var imageSource = editor3d.axesGizmo.lablesTexSource[axisName];
         var sourceWidth = imageSource[0].length;
