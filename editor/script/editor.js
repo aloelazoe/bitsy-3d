@@ -110,7 +110,8 @@ function sortedDialogIdList() {
 	keyList.splice(keyList.indexOf("title"), 1);
 	// filter out dialog id for special dialog entries like DATA3D and DRAWINGSIZE
 	specialDialogTags.forEach(function (tag) {
-		keyList.splice(keyList.indexOf(tag), 1);
+        var i = keyList.indexOf(tag);
+        if (i !== -1) keyList.splice(i, 1);
 	});
 	var keyObj = {};
 	for (var i = 0; i < keyList.length; i++) {
