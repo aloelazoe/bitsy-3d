@@ -378,11 +378,6 @@ document.addEventListener('DOMContentLoaded', function() {
             b3d.update();
             b3d.render();
         });
-        smartPatch('onready', null, function () {        
-            // remove borksy touch control fix that breaks mouse camera controls
-            var touchTriggerEl = document.getElementById('touchTrigger');
-            if (touchTriggerEl) touchTriggerEl.parentElement.removeChild(touchTriggerEl);
-        });
     }
 
     var py;
