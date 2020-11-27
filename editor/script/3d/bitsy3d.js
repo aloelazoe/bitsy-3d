@@ -179,6 +179,7 @@ b3d.cameraDataModel = {
             vector3: { target: {x: 7.5, z: 7.5, y: 0} },
             trait: {
                 attachControl: false,
+                useArrowKeysToControlCameraInsteadOfAvatar: false,
                 useLeftAndRightToRotateByAngle: 0
             },
         },
@@ -198,6 +199,10 @@ b3d.cameraDataModel = {
         attachControl: function (v) {
             if (v === true) {
                 this.ref.attachControl(b3d.sceneCanvas);
+                // update camera controls
+                if (this.hasOwnProperty('useArrowKeysToControlCameraInsteadOfAvatar')) {
+                    this.useArrowKeysToControlCameraInsteadOfAvatar = this.useArrowKeysToControlCameraInsteadOfAvatar;
+                }
             } else if (v === false) {
                 this.ref.detachControl(b3d.sceneCanvas);
             }
@@ -214,6 +219,32 @@ b3d.cameraDataModel = {
                 b3d.sceneCanvas.addEventListener("click", b3d.lockPointer);
             } else if (v === false) {
                 b3d.sceneCanvas.removeEventListener("click", b3d.lockPointer);
+            }
+        },
+        useArrowKeysToControlCameraInsteadOfAvatar: function (v) {
+            if (v === true) {
+                if (this.ref.inputs.attached.keyboard) {
+                    this.ref.inputs.attached.keyboard.keysLeft = [37];
+                    this.ref.inputs.attached.keyboard.keysUp = [38];
+                    this.ref.inputs.attached.keyboard.keysRight = [39];
+                    this.ref.inputs.attached.keyboard.keysDown = [40];
+                }
+
+                ['left', 'up', 'right', 'down'].forEach(function (k) {
+                    bitsy.key[k] = null;
+                });
+            } else if (v === false) {
+                var cam = this;
+                if (cam.ref.inputs.attached.keyboard) {
+                    ['keysLeft', 'keysUp', 'keysRight', 'keysDown'].forEach(function (k) {
+                        cam.ref.inputs.attached.keyboard[k] = [];
+                    });
+                }
+
+                bitsy.key.left = 37;
+                bitsy.key.up = 38;
+                bitsy.key.right = 39;
+                bitsy.key.down = 40;
             }
         },
         useLeftAndRightToRotateByAngle: function (v) {
